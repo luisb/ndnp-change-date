@@ -77,3 +77,10 @@ src_mets_path_1 = Path(f"{issue_path}/{from_date_path}{from_edition}_1.xml")
 if src_mets_path_1.exists():
     src_mets_path_1.unlink()
 
+# Issue PDF file (if exists)
+src_issue_pdf_path = Path(f"{issue_path}/{from_date_path}{from_edition}.pdf")
+dst_issue_pdf_path = Path(f"{issue_path}/{to_date_path}{to_edition}.pdf")
+
+if src_issue_pdf_path.exists():
+    src_issue_pdf_path.rename(dst_issue_pdf_path)
+

@@ -52,8 +52,28 @@ args = parser.parse_args()
 
 batch_path = args.batch_path
 issue_path = args.issue_path
-from_date = args.from_date
+from_date = args.from_date.strftime("%Y-%m-%d")
 from_date_path = args.from_date.strftime("%Y%m%d")
 from_edition = f"{args.from_edition:02d}"
-to_date = args.to_date
+to_date = args.to_date.strftime("%Y-%m-%d")
+to_date_path = args.to_date.strftime("%Y%m%d")
 to_edition = f"{args.to_edition:02d}"
+
+# METS file
+src_mets_path = Path(f"{issue_path}/{from_date_path}{from_edition}.xml")
+dst_mets_path = Path(f"{issue_path}/{to_date_path}{to_edition}.xml")
+
+if src_mets_path.exists():
+    data = src_mets_path.read_text(encoding="utf-8")
+    data = data.replace(from_date, to_date)
+    dst_mets_path.write_text(data, encoding="utf-8")
+
+    # Delete old METS file
+    src_mets_path.unlink()
+
+# Delete old METS _1.xml file
+src_mets_path_1 = Path(f"{issue_path}/{from_date_path}{from_edition}_1.xml")
+
+if src_mets_path_1.exists():
+    src_mets_path_1.unlink()
+

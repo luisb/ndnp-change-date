@@ -91,3 +91,19 @@ if issue_path.exists():
 
     issue_path.rename(new_issue_path)
 
+# BATCH.xml file
+batch_xml_path = Path(f"{batch_path}/BATCH.xml")
+
+if batch_xml_path.exists():
+    data = batch_xml_path.read_text(encoding="utf-8")
+    # replace issueDate
+    data = data.replace(from_date, to_date)
+    # replace path dates
+    data = data.replace(from_date_path, to_date_path)
+    batch_xml_path.write_text(data, encoding="utf-8")
+
+# Delete BATCH_1.xml
+batch1_xml_path = Path(f"{batch_path}/BATCH_1.xml")
+
+if batch1_xml_path.exists():
+    batch1_xml_path.unlink()

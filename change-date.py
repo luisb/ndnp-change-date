@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import argparse
-
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -83,4 +83,11 @@ dst_issue_pdf_path = Path(f"{issue_path}/{to_date_path}{to_edition}.pdf")
 
 if src_issue_pdf_path.exists():
     src_issue_pdf_path.rename(dst_issue_pdf_path)
+
+# Rename issue folder
+if issue_path.exists():
+    new_issue_path = re.sub(r"\d{10}$", to_date_path + to_edition, str(issue_path))
+    new_issue_path = Path(new_issue_path)
+
+    issue_path.rename(new_issue_path)
 

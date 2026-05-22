@@ -2,6 +2,7 @@
 
 import argparse
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -83,6 +84,17 @@ dst_issue_pdf_path = Path(f"{issue_path}/{to_date_path}{to_edition}.pdf")
 
 if src_issue_pdf_path.exists():
     src_issue_pdf_path.rename(dst_issue_pdf_path)
+
+# Update dates in .pdf and .jp2 files
+files = list(issue_path.rglob("*.pdf")) + list(issue_path.rglob("*.jp2"))
+
+for file in files:
+    cmd = [
+        "sed", "-i",
+        f"s/{from_date}/{to_date}/g",
+        str(file)
+    ]
+    subprocess.run(cmd, check=True)
 
 # Rename issue folder
 if issue_path.exists():

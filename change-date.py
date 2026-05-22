@@ -102,6 +102,8 @@ def replace_bytes_file(path: Path, old: bytes, new: bytes):
         log_action(f"update contents: {path}")
         if not args.dry_run:
             path.write_bytes(new_data)
+    else:
+        log_action(f"no action: No changes detected: {path} ")
 
 
 batch_path = args.batch_path

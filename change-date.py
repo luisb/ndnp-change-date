@@ -2,7 +2,6 @@
 
 import argparse
 import re
-import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -58,8 +57,48 @@ parser.add_argument('-d', '--from-date', type=valid_date, required=True)
 parser.add_argument('-e', '--from-edition', type=valid_int, required=True)
 parser.add_argument('-D', '--to-date', type=valid_date, required=True)
 parser.add_argument('-E', '--to-edition', type=valid_int, required=True)
+parser.add_argument("-n", "--dry-run", action="store_true", 
+                    help="Show what would change without modifying any files")
 
 args = parser.parse_args()
+
+
+def log_action(message):
+    prefix = "[DRY-RUN]" if args.dry_run else "[RUN]"
+    print(f"{prefix} {message}")
+
+
+def write_text_file(path: Path, data: str):
+    log_action(f"write file: {path}")
+    if not args.dry_run:
+        path.write_text(data, encoding="utf-8")
+
+
+def delete_file(path: Path):
+    if path.exists():
+        log_action(f"delete file: {path}")
+        if not args.dry_run:
+            path.unlink()
+
+
+def rename_path(src: Path, dst: Path):
+    if src.exists():
+        log_action(f"rename: {src} -> {dst}")
+        if not args.dry_run:
+            src.rename(dst)
+
+
+def replace_bytes_file(path: Path, old: bytes, new: bytes):
+    if not path.exists():
+        return
+    
+    data = path.read_bytes()
+    new_data = data.replace(old, new)
+    if new_data != data:
+        log_action(f"update contents: {path}")
+        if not args.dry_run:
+            path.write_bytes(new_data)
+
 
 batch_path = args.batch_path
 issue_path = args.issue_path
@@ -78,45 +117,42 @@ dst_mets_path = issue_path / f"{to_date_path}{to_edition}.xml"
 
 if src_mets_path.exists():
     data = src_mets_path.read_text(encoding="utf-8").replace(from_date, to_date)
-    dst_mets_path.write_text(data, encoding="utf-8")
+    write_text_file(dst_mets_path, data)
 
     # Delete old METS file
-    src_mets_path.unlink()
+    delete_file(src_mets_path)
 
 # Delete old METS _1.xml file
 src_mets_path_1 = issue_path / f"{from_date_path}{from_edition}_1.xml"
-src_mets_path_1.unlink(missing_ok=True)
+delete_file(src_mets_path_1)
 
 # Issue PDF file (if exists)
 src_issue_pdf_path = issue_path / f"{from_date_path}{from_edition}.pdf"
 dst_issue_pdf_path = issue_path / f"{to_date_path}{to_edition}.pdf"
 
-if src_issue_pdf_path.exists():
-    src_issue_pdf_path.rename(dst_issue_pdf_path)
+rename_path(src_issue_pdf_path, dst_issue_pdf_path)
 
 # Update dates in .pdf and .jp2 files
 files = list(issue_path.rglob("*.pdf")) + list(issue_path.rglob("*.jp2"))
 
 for file in files:
-    cmd = [
-        "sed", "-i",
-        f"s/{from_date}/{to_date}/g",
-        str(file)
-    ]
-    subprocess.run(cmd, check=True)
+    replace_bytes_file(file, from_date.encode("ascii"), to_date.encode("ascii"))
 
 # Rename issue folder
 if issue_path.exists():
-    new_issue_path = re.sub(r"\d{10}$", to_date_path + to_edition, str(issue_path))
-    new_issue_path = Path(new_issue_path)
-
-    issue_path.rename(new_issue_path)
+    new_issue_name = re.sub(r"\d{10}$", to_date_path + to_edition, issue_path.name)
+    new_issue_path = issue_path.with_name(new_issue_name)
+    rename_path(issue_path, new_issue_path)
 
 # BATCH.xml file
-# replace issueDate attribute
-replace_text_file(batch_path / "BATCH.xml", from_date, to_date)
-# replace path dates
-replace_text_file(batch_path / "BATCH.xml", from_date_path, to_date_path)
+batch_xml_path = batch_path / "BATCH.xml"
+if batch_xml_path.exists():
+    data = batch_xml_path.read_text(encoding="utf-8")
+    # replace issueDate attribute
+    data = data.replace(from_date, to_date)
+    # replace path dates
+    data = data.replace(from_date_path, to_date_path)
+    write_text_file(batch_xml_path, data)
 
 # Delete BATCH_1.xml
-(batch_path / "BATCH_1.xml").unlink(missing_ok=True)
+delete_file(batch_path / "BATCH_1.xml")

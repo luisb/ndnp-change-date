@@ -62,6 +62,10 @@ parser.add_argument("-n", "--dry-run", action="store_true",
 
 args = parser.parse_args()
 
+# Validate from_date and edition != to_date and edition
+if args.from_date == args.to_date and args.from_edition == args.to_edition:
+    parser.error("The to_date and to_edition cannot be the same values as the from_date and from_edition.")
+
 
 def log_action(message):
     prefix = "[DRY-RUN]" if args.dry_run else "[RUN]"

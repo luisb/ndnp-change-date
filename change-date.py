@@ -20,8 +20,7 @@ def valid_path_directory(path):
 
 def valid_date(date):
     try:
-        out_date = datetime.strptime(date, '%Y-%m-%d')
-        return out_date
+        return datetime.strptime(date, '%Y-%m-%d').date()
     except ValueError:
         raise argparse.ArgumentTypeError(f"The date {date} does not match the format YYYY-MM-DD or is invalid.")
 
@@ -53,34 +52,33 @@ args = parser.parse_args()
 
 batch_path = args.batch_path
 issue_path = args.issue_path
+
 from_date = args.from_date.strftime("%Y-%m-%d")
 from_date_path = args.from_date.strftime("%Y%m%d")
 from_edition = f"{args.from_edition:02d}"
+
 to_date = args.to_date.strftime("%Y-%m-%d")
 to_date_path = args.to_date.strftime("%Y%m%d")
 to_edition = f"{args.to_edition:02d}"
 
 # METS file
-src_mets_path = Path(f"{issue_path}/{from_date_path}{from_edition}.xml")
-dst_mets_path = Path(f"{issue_path}/{to_date_path}{to_edition}.xml")
+src_mets_path = issue_path / f"{from_date_path}{from_edition}.xml"
+dst_mets_path = issue_path / f"{to_date_path}{to_edition}.xml"
 
 if src_mets_path.exists():
-    data = src_mets_path.read_text(encoding="utf-8")
-    data = data.replace(from_date, to_date)
+    data = src_mets_path.read_text(encoding="utf-8").replace(from_date, to_date)
     dst_mets_path.write_text(data, encoding="utf-8")
 
     # Delete old METS file
     src_mets_path.unlink()
 
 # Delete old METS _1.xml file
-src_mets_path_1 = Path(f"{issue_path}/{from_date_path}{from_edition}_1.xml")
-
-if src_mets_path_1.exists():
-    src_mets_path_1.unlink()
+src_mets_path_1 = issue_path / f"{from_date_path}{from_edition}_1.xml"
+src_mets_path_1.unlink(missing_ok=True)
 
 # Issue PDF file (if exists)
-src_issue_pdf_path = Path(f"{issue_path}/{from_date_path}{from_edition}.pdf")
-dst_issue_pdf_path = Path(f"{issue_path}/{to_date_path}{to_edition}.pdf")
+src_issue_pdf_path = issue_path / f"{from_date_path}{from_edition}.pdf"
+dst_issue_pdf_path = issue_path / f"{to_date_path}{to_edition}.pdf"
 
 if src_issue_pdf_path.exists():
     src_issue_pdf_path.rename(dst_issue_pdf_path)
@@ -104,7 +102,7 @@ if issue_path.exists():
     issue_path.rename(new_issue_path)
 
 # BATCH.xml file
-batch_xml_path = Path(f"{batch_path}/BATCH.xml")
+batch_xml_path = batch_path / "BATCH.xml"
 
 if batch_xml_path.exists():
     data = batch_xml_path.read_text(encoding="utf-8")
@@ -115,7 +113,4 @@ if batch_xml_path.exists():
     batch_xml_path.write_text(data, encoding="utf-8")
 
 # Delete BATCH_1.xml
-batch1_xml_path = Path(f"{batch_path}/BATCH_1.xml")
-
-if batch1_xml_path.exists():
-    batch1_xml_path.unlink()
+(batch_path / "BATCH_1.xml").unlink(missing_ok=True)

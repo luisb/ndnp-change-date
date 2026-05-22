@@ -37,6 +37,17 @@ def valid_int(num):
     return out_num
 
 
+def replace_text_file(path: Path, old: str, new: str):
+    if not path.exists():
+        return
+    
+    data = path.read_text(encoding="utf-8")
+    new_data = data.replace(old, new)
+    
+    if new_data != data:
+        path.write_text(new_data, encoding="utf-8")
+
+
 parser = argparse.ArgumentParser(
     prog='change-date',
     description="Change date of an issue in an NDNP batch")
@@ -102,15 +113,10 @@ if issue_path.exists():
     issue_path.rename(new_issue_path)
 
 # BATCH.xml file
-batch_xml_path = batch_path / "BATCH.xml"
-
-if batch_xml_path.exists():
-    data = batch_xml_path.read_text(encoding="utf-8")
-    # replace issueDate
-    data = data.replace(from_date, to_date)
-    # replace path dates
-    data = data.replace(from_date_path, to_date_path)
-    batch_xml_path.write_text(data, encoding="utf-8")
+# replace issueDate attribute
+replace_text_file(batch_path / "BATCH.xml", from_date, to_date)
+# replace path dates
+replace_text_file(batch_path / "BATCH.xml", from_date_path, to_date_path)
 
 # Delete BATCH_1.xml
 (batch_path / "BATCH_1.xml").unlink(missing_ok=True)

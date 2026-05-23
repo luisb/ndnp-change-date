@@ -72,7 +72,10 @@ def log_action(message):
     print(f"{prefix} {message}")
 
 
-def write_text_file(path: Path, data: str):
+def write_text_file(path: Path, data: str, overwrite: bool = False):
+    if path.exists() and not overwrite:
+        raise FileExistsError(f"Refusing to overwrite existing file: {path}")
+    
     log_action(f"write file: {path}")
     if not args.dry_run:
         path.write_text(data, encoding="utf-8")
@@ -86,10 +89,18 @@ def delete_file(path: Path):
 
 
 def rename_path(src: Path, dst: Path):
-    if src.exists():
-        log_action(f"rename: {src} -> {dst}")
-        if not args.dry_run:
-            src.rename(dst)
+    if not src.exists():
+        return
+    
+    if src == dst:
+        return
+    
+    if dst.exists():
+        raise FileExistsError(f"Target already exists: {dst}")
+    
+    log_action(f"rename: {src} -> {dst}")
+    if not args.dry_run:
+        src.rename(dst)
 
 
 def replace_bytes_file(path: Path, old: bytes, new: bytes):
@@ -158,7 +169,7 @@ if batch_xml_path.exists():
     data = data.replace(from_date, to_date)
     # replace path dates
     data = data.replace(from_date_path, to_date_path)
-    write_text_file(batch_xml_path, data)
+    write_text_file(batch_xml_path, data, overwrite=True)
 
 # Delete BATCH_1.xml
 delete_file(batch_path / "BATCH_1.xml")

@@ -17,11 +17,11 @@ def valid_path_directory(path):
     return out_path
 
 
-def valid_date(date):
+def valid_date(date_str):
     try:
-        return datetime.strptime(date, '%Y-%m-%d').date()
+        return datetime.strptime(date_str, '%Y-%m-%d').date()
     except ValueError:
-        raise argparse.ArgumentTypeError(f"The date {date} does not match the format YYYY-MM-DD or is invalid.")
+        raise argparse.ArgumentTypeError(f"The date {date_str} does not match the format YYYY-MM-DD or is invalid.")
 
 
 def valid_int(num):

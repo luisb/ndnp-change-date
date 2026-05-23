@@ -106,4 +106,5 @@ The script will terminate with an error if a required directory is missing, if a
 - Add collision detection before write and rename operations.
 - Add structured logging or a `--verbose` flag for better output.
 - Add unit tests around path generation and date/edition transformations.
+- Add ability to import CSV file of date changes.
 - Others?

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import argparse
 import re
@@ -34,17 +34,6 @@ def valid_int(num):
         raise argparse.ArgumentTypeError(f"The value {num} must be 1 or greater.")
     
     return out_num
-
-
-def replace_text_file(path: Path, old: str, new: str):
-    if not path.exists():
-        return
-    
-    data = path.read_text(encoding="utf-8")
-    new_data = data.replace(old, new)
-    
-    if new_data != data:
-        path.write_text(new_data, encoding="utf-8")
 
 
 parser = argparse.ArgumentParser(

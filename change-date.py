@@ -36,24 +36,23 @@ def valid_int(num):
     return out_num
 
 
-parser = argparse.ArgumentParser(
-    prog='change-date',
-    description="Change date of an issue in an NDNP batch")
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="change-date",
+        description="Change date of an issue in an NDNP batch",
+    )
 
-parser.add_argument('-b', '--batch-path', type=valid_path_directory, required=True)
-parser.add_argument('-i', '--issue-path', type=valid_path_directory, required=True)
-parser.add_argument('-d', '--from-date', type=valid_date, required=True)
-parser.add_argument('-e', '--from-edition', type=valid_int, required=True)
-parser.add_argument('-D', '--to-date', type=valid_date, required=True)
-parser.add_argument('-E', '--to-edition', type=valid_int, required=True)
-parser.add_argument("-n", "--dry-run", action="store_true", 
-                    help="Show what would change without modifying any files")
+    parser.add_argument("-b", "--batch-path", type=valid_path_directory, required=True)
+    parser.add_argument("-i", "--issue-path", type=valid_path_directory, required=True)
+    parser.add_argument("-d", "--from-date", type=valid_date, required=True)
+    parser.add_argument("-e", "--from-edition", type=valid_int, required=True)
+    parser.add_argument("-D", "--to-date", type=valid_date, required=True)
+    parser.add_argument("-E", "--to-edition", type=valid_int, required=True)
+    parser.add_argument("-n", "--dry-run", action="store_true",
+        help="Show what would change without modifying any files",
+    )
 
-args = parser.parse_args()
-
-# Validate from_date and edition != to_date and edition
-if args.from_date == args.to_date and args.from_edition == args.to_edition:
-    parser.error("The to_date and to_edition cannot be the same values as the from_date and from_edition.")
+    return parser
 
 
 def log_action(message):
@@ -102,11 +101,8 @@ def replace_bytes_file(path: Path, old: bytes, new: bytes):
         log_action(f"update contents: {path}")
         if not args.dry_run:
             path.write_bytes(new_data)
-    
-    # Save this for the --verbose flag
-    # else:
-    #    log_action(f"no action: No changes detected: {path} ")
-
+    parser = build_parser()
+    args = parser.parse_args()
 
 batch_path = args.batch_path
 issue_path = args.issue_path

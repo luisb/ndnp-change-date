@@ -154,6 +154,10 @@ def main():
     src_issue_pdf_path = issue_path / f"{from_date_path}{from_edition}.pdf"
     dst_issue_pdf_path = issue_path / f"{to_date_path}{to_edition}.pdf"
 
+    # Ensure issue directory is in the format YYYYMMDDEE
+    if not re.search(r"\d{10}$", issue_path.name):
+        raise ValueError(f"Issue directory name does not end with YYYYMMDDEE: {issue_path.name}")
+
     new_issue_name = re.sub(r"\d{10}$", to_date_path + to_edition, issue_path.name)
     new_issue_path = issue_path.with_name(new_issue_name)
 

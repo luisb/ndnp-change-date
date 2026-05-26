@@ -55,28 +55,34 @@ def build_parser():
     return parser
 
 
-def log_action(message):
-    prefix = "[DRY-RUN]" if args.dry_run else "[RUN]"
+def log_action(message, dry_run):
+    prefix = "[DRY-RUN]" if dry_run else "[RUN]"
     print(f"{prefix} {message}")
 
 
-def write_text_file(path: Path, data: str, overwrite: bool = False):
+def write_text_file(path: Path, data: str, dry_run: bool, stats: dict, overwrite: bool = False):
     if path.exists() and not overwrite:
         raise FileExistsError(f"Refusing to overwrite existing file: {path}")
-    
-    log_action(f"write file: {path}")
-    if not args.dry_run:
+
+    log_action(f"write file: {path}", dry_run)
+    stats["written"] += 1
+
+    if not dry_run:
         path.write_text(data, encoding="utf-8")
 
 
-def delete_file(path: Path):
-    if path.exists():
-        log_action(f"delete file: {path}")
-        if not args.dry_run:
-            path.unlink()
+def delete_file(path: Path, dry_run: bool, stats: dict):
+    if not path.exists():
+        return
+
+    log_action(f"delete file: {path}", dry_run)
+    stats["deleted"] += 1
+
+    if not dry_run:
+        path.unlink()
 
 
-def rename_path(src: Path, dst: Path):
+def rename_path(src: Path, dst: Path, dry_run: bool, stats: dict):
     if not src.exists():
         return
     
@@ -85,27 +91,35 @@ def rename_path(src: Path, dst: Path):
     
     if dst.exists():
         raise FileExistsError(f"Target already exists: {dst}")
-    
-    log_action(f"rename: {src} -> {dst}")
-    if not args.dry_run:
+
+    log_action(f"rename: {src} -> {dst}", dry_run)
+    stats["renamed"] += 1
+
+    if not dry_run:
         src.rename(dst)
 
 
-def replace_bytes_file(path: Path, old: bytes, new: bytes):
+def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats: dict):
     if not path.exists():
         return
     
     data = path.read_bytes()
     new_data = data.replace(old, new)
     if new_data != data:
-        log_action(f"update contents: {path}")
-        if not args.dry_run:
+        log_action(f"update contents: {path}", dry_run)
+        stats["updated"] += 1
+
+        if not dry_run:
             path.write_bytes(new_data)
     parser = build_parser()
     args = parser.parse_args()
 
-batch_path = args.batch_path
-issue_path = args.issue_path
+    stats = {
+        "written": 0,
+        "deleted": 0,
+        "renamed": 0,
+        "updated": 0,
+    }
 
 from_date = args.from_date.strftime("%Y-%m-%d")
 from_date_path = args.from_date.strftime("%Y%m%d")
@@ -146,17 +160,26 @@ for file in files:
 if issue_path.exists():
     new_issue_name = re.sub(r"\d{10}$", to_date_path + to_edition, issue_path.name)
     new_issue_path = issue_path.with_name(new_issue_name)
-    rename_path(issue_path, new_issue_path)
+        write_text_file(dst_mets_path, data, args.dry_run, stats)
+        delete_file(src_mets_path, args.dry_run, stats)
 
-# BATCH.xml file
-batch_xml_path = batch_path / "BATCH.xml"
-if batch_xml_path.exists():
-    data = batch_xml_path.read_text(encoding="utf-8")
-    # replace issueDate attribute
-    data = data.replace(from_date, to_date)
-    # replace path dates
-    data = data.replace(from_date_path, to_date_path)
-    write_text_file(batch_xml_path, data, overwrite=True)
+    delete_file(src_mets_path_1, args.dry_run, stats)
 
-# Delete BATCH_1.xml
-delete_file(batch_path / "BATCH_1.xml")
+    rename_path(src_issue_pdf_path, dst_issue_pdf_path, args.dry_run, stats)
+
+        replace_bytes_file(file, old_bytes, new_bytes, args.dry_run, stats)
+
+    rename_path(issue_path, new_issue_path, args.dry_run, stats)
+
+        write_text_file(batch_xml_path, data, args.dry_run, stats, overwrite=True)
+
+    delete_file(batch_xml_1_path, args.dry_run, stats)
+
+    log_action(
+        "summary: "
+        f"written={stats['written']}, "
+        f"deleted={stats['deleted']}, "
+        f"renamed={stats['renamed']}, "
+        f"updated={stats['updated']}",
+        args.dry_run,
+    )

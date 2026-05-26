@@ -111,8 +111,22 @@ def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats:
 
         if not dry_run:
             path.write_bytes(new_data)
+
+
+def ensure_missing(path: Path, label: str):
+    if path.exists():
+        raise FileExistsError(f"{label} already exists: {path}")
+
+
+def main():
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.from_date == args.to_date and args.from_edition == args.to_edition:
+        parser.error(
+            "The to_date and to_edition cannot be the same values as the "
+            "from_date and from_edition."
+        )
 
     stats = {
         "written": 0,
@@ -121,58 +135,72 @@ def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats:
         "updated": 0,
     }
 
-from_date = args.from_date.strftime("%Y-%m-%d")
-from_date_path = args.from_date.strftime("%Y%m%d")
-from_edition = f"{args.from_edition:02d}"
+    batch_path = args.batch_path
+    issue_path = args.issue_path
 
-to_date = args.to_date.strftime("%Y-%m-%d")
-to_date_path = args.to_date.strftime("%Y%m%d")
-to_edition = f"{args.to_edition:02d}"
+    from_date = args.from_date.strftime("%Y-%m-%d")
+    from_date_path = args.from_date.strftime("%Y%m%d")
+    from_edition = f"{args.from_edition:02d}"
 
-# METS file
-src_mets_path = issue_path / f"{from_date_path}{from_edition}.xml"
-dst_mets_path = issue_path / f"{to_date_path}{to_edition}.xml"
+    to_date = args.to_date.strftime("%Y-%m-%d")
+    to_date_path = args.to_date.strftime("%Y%m%d")
+    to_edition = f"{args.to_edition:02d}"
 
-if src_mets_path.exists():
-    data = src_mets_path.read_text(encoding="utf-8").replace(from_date, to_date)
-    write_text_file(dst_mets_path, data)
+    src_mets_path = issue_path / f"{from_date_path}{from_edition}.xml"
+    dst_mets_path = issue_path / f"{to_date_path}{to_edition}.xml"
 
-    # Delete old METS file
-    delete_file(src_mets_path)
+    src_mets_path_1 = issue_path / f"{from_date_path}{from_edition}_1.xml"
 
-# Delete old METS _1.xml file
-src_mets_path_1 = issue_path / f"{from_date_path}{from_edition}_1.xml"
-delete_file(src_mets_path_1)
+    src_issue_pdf_path = issue_path / f"{from_date_path}{from_edition}.pdf"
+    dst_issue_pdf_path = issue_path / f"{to_date_path}{to_edition}.pdf"
 
-# Issue PDF file (if exists)
-src_issue_pdf_path = issue_path / f"{from_date_path}{from_edition}.pdf"
-dst_issue_pdf_path = issue_path / f"{to_date_path}{to_edition}.pdf"
-
-rename_path(src_issue_pdf_path, dst_issue_pdf_path)
-
-# Update dates in .pdf and .jp2 files
-files = list(issue_path.rglob("*.pdf")) + list(issue_path.rglob("*.jp2"))
-
-for file in files:
-    replace_bytes_file(file, from_date.encode("ascii"), to_date.encode("ascii"))
-
-# Rename issue folder
-if issue_path.exists():
     new_issue_name = re.sub(r"\d{10}$", to_date_path + to_edition, issue_path.name)
     new_issue_path = issue_path.with_name(new_issue_name)
+
+    batch_xml_path = batch_path / "BATCH.xml"
+    batch_xml_1_path = batch_path / "BATCH_1.xml"
+
+    # Complete destination collision checks before modifying data
+    if src_mets_path.exists():
+        ensure_missing(dst_mets_path, "Destination METS file")
+
+    if src_issue_pdf_path.exists():
+        ensure_missing(dst_issue_pdf_path, "Destination issue PDF")
+
+    if new_issue_path != issue_path:
+        ensure_missing(new_issue_path, "Destination issue directory")
+
+    # METS file
+    if src_mets_path.exists():
+        data = src_mets_path.read_text(encoding="utf-8").replace(from_date, to_date)
         write_text_file(dst_mets_path, data, args.dry_run, stats)
         delete_file(src_mets_path, args.dry_run, stats)
 
+    # Delete old METS _1.xml file
     delete_file(src_mets_path_1, args.dry_run, stats)
 
+    # Issue PDF file
     rename_path(src_issue_pdf_path, dst_issue_pdf_path, args.dry_run, stats)
 
+    # Update dates in .pdf and .jp2 files
+    files = list(issue_path.rglob("*.pdf")) + list(issue_path.rglob("*.jp2"))
+    old_bytes = from_date.encode("ascii")
+    new_bytes = to_date.encode("ascii")
+
+    for file in files:
         replace_bytes_file(file, old_bytes, new_bytes, args.dry_run, stats)
 
+    # Rename issue folder
     rename_path(issue_path, new_issue_path, args.dry_run, stats)
 
+    # BATCH.xml file
+    if batch_xml_path.exists():
+        data = batch_xml_path.read_text(encoding="utf-8")
+        data = data.replace(from_date, to_date)
+        data = data.replace(from_date_path, to_date_path)
         write_text_file(batch_xml_path, data, args.dry_run, stats, overwrite=True)
 
+    # Delete BATCH_1.xml
     delete_file(batch_xml_1_path, args.dry_run, stats)
 
     log_action(
@@ -183,3 +211,7 @@ if issue_path.exists():
         f"updated={stats['updated']}",
         args.dry_run,
     )
+
+
+if __name__ == "__main__":
+    main()

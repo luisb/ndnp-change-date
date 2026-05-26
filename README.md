@@ -99,12 +99,9 @@ The script will terminate with an error if a required directory is missing, if a
 ## Notes and cautions
 
 - This script performs destructive actions such as deleting files, modifying binary files, and renaming paths, so `--dry-run` is strongly recommended before running it against production data.
-- Destination collision checks are a good next improvement, especially before overwriting a new XML or renaming the issue directory.
 
 ## Future improvements
 
-- Add collision detection before write and rename operations.
-- Add structured logging or a `--verbose` flag for better output.
-- Add unit tests around path generation and date/edition transformations.
 - Add ability to import CSV file of date changes.
+- Add structured logging or a `--verbose` flag for better output.
 - Others?

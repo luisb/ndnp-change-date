@@ -11,14 +11,12 @@ NS = {
     "mods": "http://www.loc.gov/mods/v3",
 }
 
-ET.register_namespace("", NS["mets"])
 ET.register_namespace("MODS", NS["mods"])
 
 BATCH_NS = {
     "ndnp": "http://www.loc.gov/ndnp",
 }
 
-ET.register_namespace("", BATCH_NS["ndnp"])
 ET.register_namespace("ndnp", BATCH_NS["ndnp"])
 
 
@@ -135,6 +133,16 @@ def ensure_missing(path: Path, label: str):
         raise FileExistsError(f"{label} already exists: {path}")
 
 
+def mets_xml_to_text(root: ET.Element) -> str:
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True, 
+                       default_namespace=NS["mets"]).decode("utf-8")
+
+
+def batch_xml_to_text(root: ET.Element) -> str:
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True, 
+                       default_namespace=BATCH_NS["ndnp"]).decode("utf-8")
+
+
 def build_updated_mets_xml(
     src_path: Path,
     from_date: str,
@@ -163,8 +171,7 @@ def build_updated_mets_xml(
     if edition_elem is not None and edition_elem.text == str(int(from_edition)):
         edition_elem.text = str(int(to_edition))
 
-    return ET.tostring(root, encoding="unicode", xml_declaration=True)
-
+    return mets_xml_to_text(root)
 
 def build_updated_batch_xml(
     src_path: Path,
@@ -192,7 +199,7 @@ def build_updated_batch_xml(
             issue.text = issue_text.replace(old_stem, new_stem)
             break
 
-    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+    return batch_xml_to_text(root)
 
 
 def main():

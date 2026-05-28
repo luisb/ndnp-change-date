@@ -262,6 +262,17 @@ def mets_has_questionable_date(src_path: Path, target_date: str) -> bool:
     return False
 
 
+def mets_has_any_questionable_date(src_path: Path) -> bool:
+    tree = ET.parse(src_path)
+    root = tree.getroot()
+
+    for elem in root.findall(".//mods:originInfo/mods:dateIssued", NS):
+        if elem.get("qualifier") == "questionable":
+            return True
+        
+    return False
+
+
 def main():
     parser = build_parser()
     args = parser.parse_args()
@@ -337,6 +348,19 @@ def main():
         if not mets_has_questionable_date(src_mets_path, from_questionable):
             parser.error(f'The questionable date "{from_questionable}" was not found in {src_mets_path}.')
 
+    # Ensure source METS exists for questionable-date operations
+    if args.from_questionable or args.to_questionable:
+        if not src_mets_path.exists():
+            parser.error(f"Source METS file does not exist: {src_mets_path}")
+
+    # If creating a questionable date, error if any questionable date already exists
+    if args.to_questionable and not args.from_questionable:
+        if mets_has_any_questionable_date(src_mets_path):
+            parser.error(
+                f'A questionable date already exists in {src_mets_path}; '
+                f'use -q to update it instead of adding another one.'
+            )
+    
     # METS file
     if src_mets_path.exists():
         data = build_updated_mets_xml(

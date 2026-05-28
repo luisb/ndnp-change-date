@@ -265,6 +265,11 @@ def main():
     if not re.search(r"\d{10}$", args.issue_path.name):
         parser.error(f"Issue directory name does not end with YYYYMMDDEE: {args.issue_path.name}")
 
+    if (args.from_questionable
+        and args.to_questionable
+        and args.from_questionable == args.to_questionable):
+        parser.error("The to_questionable date cannot be the same as the from_questionable date.")
+        
     stats = {
         "written": 0,
         "deleted": 0,

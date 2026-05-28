@@ -251,6 +251,17 @@ def build_updated_batch_xml(
     return batch_xml_to_text(root)
 
 
+def mets_has_questionable_date(src_path: Path, target_date: str) -> bool:
+    tree = ET.parse(src_path)
+    root = tree.getroot()
+
+    for elem in root.findall(".//mods:originInfo/mods:dateIssued", NS):
+        if elem.get("qualifier") == "questionable" and elem.text == target_date:
+            return True
+        
+    return False
+
+
 def main():
     parser = build_parser()
     args = parser.parse_args()
@@ -269,7 +280,7 @@ def main():
         and args.to_questionable
         and args.from_questionable == args.to_questionable):
         parser.error("The to_questionable date cannot be the same as the from_questionable date.")
-        
+
     stats = {
         "written": 0,
         "deleted": 0,
@@ -318,6 +329,13 @@ def main():
     if new_issue_path != issue_path:
         ensure_missing(new_issue_path, "Destination issue directory")
 
+    if from_questionable:
+        if not src_mets_path.exists():
+            parser.error(f"Source METS file does not exist: {src_mets_path}")
+
+        if not mets_has_questionable_date(src_mets_path, from_questionable):
+            parser.error(f'The questionable date "{from_questionable}" was not found in {src_mets_path}.')
+            
     # METS file
     if src_mets_path.exists():
         data = build_updated_mets_xml(

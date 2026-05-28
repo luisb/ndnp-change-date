@@ -4,7 +4,7 @@ import argparse
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
 NS = {
@@ -21,7 +21,7 @@ BATCH_NS = {
 ET.register_namespace("ndnp", BATCH_NS["ndnp"])
 
 
-def valid_path_directory(path):
+def valid_path_directory(path) -> Path:
     out_path = Path(path)
     
     if not out_path.exists():
@@ -33,14 +33,14 @@ def valid_path_directory(path):
     return out_path
 
 
-def valid_date(date_str):
+def valid_date(date_str) -> date:
     try:
         return datetime.strptime(date_str, '%Y-%m-%d').date()
     except ValueError:
         raise argparse.ArgumentTypeError(f"The date {date_str} does not match the format YYYY-MM-DD or is invalid.")
 
 
-def valid_int(num):
+def valid_int(num) -> int:
     try:
         out_num = int(num)
     except ValueError:
@@ -52,7 +52,7 @@ def valid_int(num):
     return out_num
 
 
-def build_parser():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="change-date",
         description="Change date of an issue in an NDNP batch",
@@ -74,12 +74,12 @@ def build_parser():
     return parser
 
 
-def log_action(message, dry_run):
+def log_action(message, dry_run) -> None:
     prefix = "[DRY-RUN]" if dry_run else "[RUN]"
     print(f"{prefix} {message}")
 
 
-def write_text_file(path: Path, data: str, dry_run: bool, stats: dict, overwrite: bool = False):
+def write_text_file(path: Path, data: str, dry_run: bool, stats: dict, overwrite: bool = False) -> None:
     if path.exists() and not overwrite:
         raise FileExistsError(f"Refusing to overwrite existing file: {path}")
 
@@ -90,7 +90,7 @@ def write_text_file(path: Path, data: str, dry_run: bool, stats: dict, overwrite
         path.write_text(data, encoding="utf-8")
 
 
-def delete_file(path: Path, dry_run: bool, stats: dict):
+def delete_file(path: Path, dry_run: bool, stats: dict) -> None:
     if not path.exists():
         return
 
@@ -101,7 +101,7 @@ def delete_file(path: Path, dry_run: bool, stats: dict):
         path.unlink()
 
 
-def rename_path(src: Path, dst: Path, dry_run: bool, stats: dict):
+def rename_path(src: Path, dst: Path, dry_run: bool, stats: dict) -> None:
     if not src.exists():
         return
     
@@ -118,7 +118,7 @@ def rename_path(src: Path, dst: Path, dry_run: bool, stats: dict):
         src.rename(dst)
 
 
-def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats: dict):
+def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats: dict) -> None:
     if not path.exists():
         return
     
@@ -132,7 +132,7 @@ def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats:
             path.write_bytes(new_data)
 
 
-def ensure_missing(path: Path, label: str):
+def ensure_missing(path: Path, label: str) -> None:
     if path.exists():
         raise FileExistsError(f"{label} already exists: {path}")
 
@@ -229,8 +229,8 @@ def build_updated_batch_xml(
     from_date_path: str,
     to_date_path: str,
     from_edition: str,
-    to_edition: str,
-) -> str:
+    to_edition: str) -> str:
+
     tree = ET.parse(src_path)
     root = tree.getroot()
 
@@ -329,13 +329,14 @@ def main():
     if new_issue_path != issue_path:
         ensure_missing(new_issue_path, "Destination issue directory")
 
+    # Ensure from_questionable exists as questionable date
     if from_questionable:
         if not src_mets_path.exists():
             parser.error(f"Source METS file does not exist: {src_mets_path}")
 
         if not mets_has_questionable_date(src_mets_path, from_questionable):
             parser.error(f'The questionable date "{from_questionable}" was not found in {src_mets_path}.')
-            
+
     # METS file
     if src_mets_path.exists():
         data = build_updated_mets_xml(

@@ -1,11 +1,13 @@
 # change-date
 
-`change-date` is a command-line Python script for updating the date and edition for an issue inside an NDNP batch. It validates input paths and dates, renames issue-level files, updates XML content, updates embedded date metadata in `.pdf` and `.jp2` files, renames the issue directory, and removes stale `_1.xml` files. The `_1.xml` files are deleted so that the batch can be revalidated using "Validate All Unvalidated, and Update" in the DVV.
+`change-date` is a command-line Python script that updates the date and edition metadata for a single issue in an NDNP batch, renames related issue files, updates `BATCH.xml`, and optionally manages a questionable `mods:dateIssued` value in the issue METS XML. 
+
+It validates input paths and dates, renames issue-level files, updates XML content, updates embedded date metadata in `.pdf` and `.jp2` files, renames the issue directory, and removes stale `_1.xml` files. The `_1.xml` files are deleted so that the batch can be revalidated using "Validate All Unvalidated, and Update" in the DVV.
 
 ## Requirements
 
-- Python 3.9 or newer is recommended.
-- The script uses only the Python standard library: `argparse`, `re`, `pathlib`, and `datetime`.
+- Python 3.9 or newer.
+- The script uses only the Python standard library: `argparse`, `pathlib`, `datetime`, `re`, and `xml.etree.ElementTree`.
 
 ## Usage
 
@@ -24,26 +26,69 @@ python3 change-date.py \
 | Argument | Required | Description |
 |---|---|---|
 | `-b`, `--batch-path` | Yes | Absolute or relative path to the NDNP batch directory. |
-| `-i`, `--issue-path` | Yes | Absolute or relative path to the issue directory to update. |
-| `-d`, `--from-date` | Yes | Existing issue date in `YYYY-MM-DD` format. |
-| `-e`, `--from-edition` | Yes | Existing edition number as an integer greater than or equal to 1. |
+| `-i`, `--issue-path` | Yes | Absolute or relative path to the issue directory. Must be a directory whose name ends in `YYYYMMDDEE`. |
+| `-d`, `--from-date` | Yes | Current issue date in `YYYY-MM-DD` format. |
+| `-e`, `--from-edition` | Yes | Current edition number, integer `>= 1`. |
 | `-D`, `--to-date` | Yes | New issue date in `YYYY-MM-DD` format. |
-| `-E`, `--to-edition` | Yes | New edition number as an integer greater than or equal to 1. |
-| `-n`, `--dry-run` | No | Show planned changes without modifying files. |
+| `-E`, `--to-edition` | Yes | New edition number, integer `>= 1`. |
+| `-q`, `--from-questionable` | No | Existing questionable date to delete or replace. |
+| `-Q`, `--to-questionable` | No | New questionable date to add or replace with. |
+| `-n`, `--dry-run` | No | Show planned changes without writing, deleting, or renaming files. |
 
-## Example
+## Examples
+
+### Change date and edition only
 
 ```bash
-python3 change-date.py \
-  -b /mnt/ingest/batches/batch_curiv_delilahbeasley \
-  -i /mnt/ingest/batches/batch_curiv_delilahbeasley/sn88086183/00516992189/1901010101 \
-  -d 1901-01-01 \
+python3 change-date \
+  -b /data/batches/batch_001 \
+  -i /data/batches/batch_001/issues/1900010101 \
+  -d 1900-01-01 \
   -e 1 \
-  -D 1901-01-08 \
+  -D 1900-01-08 \
   -E 2
 ```
 
-This updates issue `1901010101` to `1901010802`, renames matching issue-level files, updates XML references, and removes stale `_1.xml` files.
+### Change date and remove a questionable date
+
+```bash
+python3 change-date \
+  -b /data/batches/batch_001 \
+  -i /data/batches/batch_001/issues/1900010101 \
+  -d 1900-01-01 \
+  -e 1 \
+  -D 1900-01-08 \
+  -E 2 \
+  -q 1900-01-03
+```
+
+### Change date and replace a questionable date
+
+```bash
+python3 change-date \
+  -b /data/batches/batch_001 \
+  -i /data/batches/batch_001/issues/1900010101 \
+  -d 1900-01-01 \
+  -e 1 \
+  -D 1900-01-08 \
+  -E 2 \
+  -q 1900-01-03 \
+  -Q 1900-01-04
+```
+
+### Change date and add a new questionable date
+
+```bash
+python3 change-date \
+  -b /data/batches/batch_001 \
+  -i /data/batches/batch_001/issues/1900010101 \
+  -d 1900-01-01 \
+  -e 1 \
+  -D 1900-01-08 \
+  -E 2 \
+  -Q 1900-01-04
+```
+
 
 ## What it does
 
@@ -51,13 +96,13 @@ Given a batch directory, an issue directory, a source date and edition, and a ta
 
 - Validates that the batch and issue paths exist and are directories.
 - Validates input dates in `YYYY-MM-DD` format.
-- Builds source and destination filenames using date strings in both `YYYY-MM-DD` and `YYYYMMDD` formats.
-- Copies the issue METS XML to its new filename while replacing the old issue date with the new one.
+- Change the issue date and edition in the METS XML and writes the METS XML to the new filename.
 - Deletes the old METS XML and the old `_1.xml` companion file if they exist.
 - Renames the issue PDF to match the new date and edition if the file exists.
 - Walks the issue directory recursively and replaces embedded date strings in `.pdf` and `.jp2` files.
 - Renames the issue directory to match the new date and edition.
-- Updates `BATCH.xml` by replacing the issue date and path date values, then deletes `BATCH_1.xml` if present.
+- Updates `BATCH.xml` by replacing the `issueDate`, `editionOrder`, and path date values, then deletes `BATCH_1.xml` if present.
+- Add, replace, or delete a questionable `mods:dateIssued` value in the METS XML.
 
 ## Dry run
 
@@ -82,9 +127,9 @@ That means:
 
 Depending on what exists in the issue directory and batch directory, the script may touch these files:
 
-- `<issue_path>/<from_date_path><from_edition>.xml`
-- `<issue_path>/<from_date_path><from_edition>_1.xml`
-- `<issue_path>/<from_date_path><from_edition>.pdf`
+- `<issue_path>/<from_date><from_edition>.xml`
+- `<issue_path>/<from_date><from_edition>_1.xml`
+- `<issue_path>/<from_date><from_edition>.pdf`
 - Any recursive `*.pdf` files under the issue directory
 - Any recursive `*.jp2` files under the issue directory
 - `<batch_path>/BATCH.xml`
@@ -103,5 +148,4 @@ The script will terminate with an error if a required directory is missing, if a
 ## Future improvements
 
 - Add ability to import CSV file of date changes.
-- Add structured logging or a `--verbose` flag for better output.
-- Others?
+- Add a `--verbose` flag for more detailed actions.

@@ -5,6 +5,7 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 NS = {
     "mets": "http://www.loc.gov/METS/",
@@ -63,9 +64,12 @@ def build_parser():
     parser.add_argument("-e", "--from-edition", type=valid_int, required=True)
     parser.add_argument("-D", "--to-date", type=valid_date, required=True)
     parser.add_argument("-E", "--to-edition", type=valid_int, required=True)
+    parser.add_argument("-q", "--from-questionable", type=valid_date, 
+                        help="Specify questionable date to delete or change")
+    parser.add_argument("-Q", "--to-questionable", type=valid_date, 
+                        help="Specify questionable date to add or change to")
     parser.add_argument("-n", "--dry-run", action="store_true",
-        help="Show what would change without modifying any files",
-    )
+                        help="Show what would change without modifying any files")
 
     return parser
 
@@ -149,9 +153,14 @@ def build_updated_mets_xml(
     to_date: str,
     from_edition: str,
     to_edition: str,
-) -> str:
+    from_questionable: Optional[str] = None,
+    to_questionable: Optional[str] = None) -> str:
+
     tree = ET.parse(src_path)
     root = tree.getroot()
+
+    mods_ns = f"{{{NS['mods']}}}"
+    origin_info = root.find(".//mods:originInfo", NS)
 
     # Update LABEL attribute on root <mets> element
     label = root.get("LABEL")
@@ -170,6 +179,44 @@ def build_updated_mets_xml(
     edition_elem = root.find(".//mods:detail[@type='edition']/mods:number", NS)
     if edition_elem is not None and edition_elem.text == str(int(from_edition)):
         edition_elem.text = str(int(to_edition))
+
+    # Handle questionable dateIssued
+    if origin_info is not None:
+        questionable_elem = None
+        normal_elem = None
+
+        for elem in origin_info.findall("mods:dateIssued", NS):
+            if elem.get("qualifier") == "questionable":
+                if from_questionable is None or elem.text == from_questionable:
+                    questionable_elem = elem
+            elif normal_elem is None:
+                normal_elem = elem
+
+        # Case 1: -q only -> delete matching questionable date
+        if from_questionable and not to_questionable:
+            if questionable_elem is not None and questionable_elem.text == from_questionable:
+                origin_info.remove(questionable_elem)
+
+        # Case 2: -q and -Q -> change matching questionable date
+        elif from_questionable and to_questionable:
+            if questionable_elem is not None and questionable_elem.text == from_questionable:
+                questionable_elem.text = to_questionable
+
+        # Case 3: -Q only -> add questionable date after normal dateIssued
+        elif not from_questionable and to_questionable:
+            if questionable_elem is None:
+                new_elem = ET.Element(f"{mods_ns}dateIssued", {
+                    "encoding": "iso8601",
+                    "qualifier": "questionable",
+                })
+                new_elem.text = to_questionable
+
+                if normal_elem is not None:
+                    children = list(origin_info)
+                    insert_at = children.index(normal_elem) + 1
+                    origin_info.insert(insert_at, new_elem)
+                else:
+                    origin_info.append(new_elem)
 
     return mets_xml_to_text(root)
 
@@ -214,7 +261,7 @@ def main():
     
     # Ensure issue directory is in the format YYYYMMDDEE
     if not re.search(r"\d{10}$", args.issue_path.name):
-        parser.error(f"Issue directory name does not end with YYYYMMDDEE: {issue_path.name}")
+        parser.error(f"Issue directory name does not end with YYYYMMDDEE: {args.issue_path.name}")
 
     stats = {
         "written": 0,
@@ -233,6 +280,12 @@ def main():
     to_date = args.to_date.strftime("%Y-%m-%d")
     to_date_path = args.to_date.strftime("%Y%m%d")
     to_edition = f"{args.to_edition:02d}"
+
+    from_questionable = (args.from_questionable.strftime("%Y-%m-%d")
+                         if args.from_questionable else None)
+
+    to_questionable = (args.to_questionable.strftime("%Y-%m-%d")
+                       if args.to_questionable else None)
 
     src_mets_path = issue_path / f"{from_date_path}{from_edition}.xml"
     dst_mets_path = issue_path / f"{to_date_path}{to_edition}.xml"
@@ -266,6 +319,8 @@ def main():
             to_date,
             from_edition,
             to_edition,
+            from_questionable,
+            to_questionable
         )
         write_text_file(dst_mets_path, data, args.dry_run, stats)
         delete_file(src_mets_path, args.dry_run, stats)

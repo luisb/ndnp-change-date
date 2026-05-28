@@ -138,13 +138,15 @@ def ensure_missing(path: Path, label: str):
 
 
 def mets_xml_to_text(root: ET.Element) -> str:
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True, 
-                       default_namespace=NS["mets"]).decode("utf-8")
+    ET.register_namespace("", NS["mets"])
+    ET.register_namespace("MODS", NS["mods"])
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
 
 def batch_xml_to_text(root: ET.Element) -> str:
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True, 
-                       default_namespace=BATCH_NS["ndnp"]).decode("utf-8")
+    ET.register_namespace("", BATCH_NS["ndnp"])
+    ET.register_namespace("ndnp", BATCH_NS["ndnp"])
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
 
 def build_updated_mets_xml(

@@ -10,15 +10,16 @@ from typing import Optional
 NS = {
     "mets": "http://www.loc.gov/METS/",
     "mods": "http://www.loc.gov/mods/v3",
-}
-
-ET.register_namespace("MODS", NS["mods"])
-
-BATCH_NS = {
+    "xsi": "http://www.w3.org/2001/XMLSchema-instance",
+    "xlink": "http://www.w3.org/1999/xlink",
+    "mix": "http://www.loc.gov/mix/",
+    "premis": "http://www.loc.gov/standards/premis",
+    "dsig": "http://www.w3.org/2000/09/xmldsig#",
     "ndnp": "http://www.loc.gov/ndnp",
 }
 
-ET.register_namespace("ndnp", BATCH_NS["ndnp"])
+for prefix, uri in NS.items():
+    ET.register_namespace(prefix if prefix != "mets" else "", uri)
 
 
 def valid_path_directory(path) -> Path:
@@ -138,14 +139,10 @@ def ensure_missing(path: Path, label: str) -> None:
 
 
 def mets_xml_to_text(root: ET.Element) -> str:
-    ET.register_namespace("", NS["mets"])
-    ET.register_namespace("MODS", NS["mods"])
     return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
 
 def batch_xml_to_text(root: ET.Element) -> str:
-    ET.register_namespace("", BATCH_NS["ndnp"])
-    ET.register_namespace("ndnp", BATCH_NS["ndnp"])
     return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
 
@@ -237,7 +234,7 @@ def build_updated_batch_xml(
     old_stem = f"{from_date_path}{from_edition}"
     new_stem = f"{to_date_path}{to_edition}"
 
-    for issue in root.findall(".//ndnp:issue", BATCH_NS):
+    for issue in root.findall(".//ndnp:issue", NS):
         issue_date = issue.get("issueDate")
         edition_order = issue.get("editionOrder")
         issue_text = issue.text or ""

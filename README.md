@@ -1,13 +1,11 @@
 # change-date
 
-`change-date` is a command-line Python script that updates the date and edition metadata for a single issue in an NDNP batch, renames related issue files, updates `BATCH.xml`, and optionally manages a questionable `mods:dateIssued` value in the issue METS XML. 
-
-It validates input paths and dates, renames issue-level files, updates XML content, updates embedded date metadata in `.pdf` and `.jp2` files, renames the issue directory, and removes stale `_1.xml` files. The `_1.xml` files are deleted so that the batch can be revalidated using "Validate All Unvalidated, and Update" in the DVV.
+Update the date, edition, and questionable-date metadata for an issue in an NDNP batch.
 
 ## Requirements
 
 - Python 3.9 or newer.
-- The script uses only the Python standard library: `argparse`, `pathlib`, `datetime`, `re`, and `xml.etree.ElementTree`.
+- The script uses only the Python standard library.
 
 ## Usage
 
@@ -15,113 +13,149 @@ It validates input paths and dates, renames issue-level files, updates XML conte
 python3 change-date.py \
   --batch-path /path/to/batch \
   --issue-path /path/to/batch/lccn/reel/issue \
-  --from-date 1901-01-01 \
-  --from-edition 1 \
-  --to-date 1901-01-02 \
-  --to-edition 2
+  [options]
 ```
 
 ### Arguments
 
-| Argument | Required | Description |
-|---|---|---|
-| `-b`, `--batch-path` | Yes | Absolute or relative path to the NDNP batch directory. |
-| `-i`, `--issue-path` | Yes | Absolute or relative path to the issue directory. Must be a directory whose name ends in `YYYYMMDDEE`. |
-| `-d`, `--from-date` | Yes | Current issue date in `YYYY-MM-DD` format. |
-| `-e`, `--from-edition` | Yes | Current edition number, integer `>= 1`. |
-| `-D`, `--to-date` | Yes | New issue date in `YYYY-MM-DD` format. |
-| `-E`, `--to-edition` | Yes | New edition number, integer `>= 1`. |
-| `-q`, `--from-questionable` | No | Existing questionable date to delete or replace. |
-| `-Q`, `--to-questionable` | No | New questionable date to add or replace with. |
-| `-n`, `--dry-run` | No | Show planned changes without writing, deleting, or renaming files. |
+ Option | Meaning |
+|---|---|
+| `-b`, `--batch-path` | Path to the NDNP batch directory. |
+| `-i`, `--issue-path` | Path to the issue directory. |
+| `-d`, `--from-date` | Source issue date in `YYYY-MM-DD`. |
+| `-e`, `--from-edition` | Source edition number, integer `>= 1`. |
+| `-D`, `--to-date` | Destination issue date in `YYYY-MM-DD`. |
+| `-E`, `--to-edition` | Destination edition number, integer `>= 1`. |
+| `-q`, `--from-questionable` | Existing questionable date to delete or replace. |
+| `-Q`, `--to-questionable` | New questionable date to add or replace with. |
+| `-n`, `--dry-run` | Show actions without writing, deleting, renaming, or modifying files. |
 
-## Examples
+## Modes
 
-### Change date and edition only
+### 1. Full date/edition change
+
+Use `-d`, `-e`, `-D`, and `-E` together. All four options are required for this mode.
+
+This mode:
+
+- Updates the root METS `LABEL` when it contains the old date.
+- Updates non-questionable `mods:dateIssued` values in the issue METS XML.
+- Updates the edition number in `mods:detail[@type='edition']/mods:number`.
+- Writes a new METS file named for the destination date/edition.
+- Deletes the old METS file.
+- Deletes the old `_1.xml` METS sidecar if present.
+- Renames the issue PDF if present.
+- Replaces embedded old-date byte strings with the new date inside `.pdf` and `.jp2` files beneath the issue directory.
+- Renames the issue directory to match the new `YYYYMMDDNN` suffix.
+- Updates the matching `<issue>` entry in `BATCH.xml`.
+- Deletes `BATCH_1.xml` if present.
+
+Example:
 
 ```bash
 python3 change-date \
-  -b /data/batches/batch_001 \
-  -i /data/batches/batch_001/issues/1900010101 \
-  -d 1900-01-01 \
+  -b /data/batches/batch_curiv_delilahbeasley \
+  -i /data/batches/batch_curiv_delilahbeasley/sn88086183/00516992189/1948010201 \
+  -d 1948-01-02 \
   -e 1 \
-  -D 1900-01-08 \
+  -D 1947-01-02 \
   -E 2
 ```
 
-### Change date and remove a questionable date
+### 2. Delete a questionable date
+
+Use `-q` by itself.
+
+This mode finds the issue METS file in the issue directory and removes the matching `mods:dateIssued` element whose `qualifier` is `questionable`.
+
+Example:
 
 ```bash
-python3 change-date \
-  -b /data/batches/batch_001 \
-  -i /data/batches/batch_001/issues/1900010101 \
-  -d 1900-01-01 \
-  -e 1 \
-  -D 1900-01-08 \
-  -E 1 \
-  -q 1900-01-03
+python3 change-date.py \
+  -b /data/batch_curiv_delilahbeasley \
+  -i /data/batch_curiv_delilahbeasley/sn88086183/00516992189/1948010201 \
+  -q 1947-01-02
 ```
 
-### Change date and replace a questionable date
+### 3. Replace a questionable date
+
+Use `-q` and `-Q` together.
+
+This mode updates the matching questionable `mods:dateIssued` value in the issue METS file.
+
+Example:
 
 ```bash
-python3 change-date \
-  -b /data/batches/batch_001 \
-  -i /data/batches/batch_001/issues/1900010101 \
-  -d 1900-01-01 \
-  -e 1 \
-  -D 1900-01-08 \
-  -E 1 \
-  -q 1900-01-03 \
-  -Q 1900-01-04
+python3 change-date.py \
+  -b /data/batch_curiv_delilahbeasley \
+  -i /data/batch_curiv_delilahbeasley/sn88086183/00516992189/1948010201 \
+  -q 1949-01-02 \
+  -Q 1947-01-02
 ```
 
-### Change date and add a new questionable date
+### 4. Add a questionable date
+
+Use `-Q` by itself.
+
+This mode adds a new `mods:dateIssued qualifier="questionable" encoding="iso8601"` element after the first non-questionable `mods:dateIssued` entry when possible. If no normal `dateIssued` exists, the new element is appended under `mods:originInfo`.
+
+Example:
 
 ```bash
-python3 change-date \
-  -b /data/batches/batch_001 \
-  -i /data/batches/batch_001/issues/1900010101 \
-  -d 1900-01-01 \
-  -e 1 \
-  -D 1900-01-08 \
-  -E 1 \
-  -Q 1900-01-04
+python3 change-date.py \
+  -b /data/batch_curiv_delilahbeasley \
+  -i /data/batch_curiv_delilahbeasley/sn88086183/00516992189/1948010201 \
+  -Q 1947-01-02
 ```
 
+## Validation rules
 
-## What it does
+The script stops with an error in these cases:
 
-Given a batch directory, an issue directory, a source date and edition, and a target date and edition, the script performs these operations:
-
-- Validates that the batch and issue paths exist and are directories.
-- Validates input dates in `YYYY-MM-DD` format.
-- Change the issue date and edition in the METS XML and writes the METS XML to the new filename.
-- Deletes the old METS XML and the old `_1.xml` companion file if they exist.
-- Renames the issue PDF to match the new date and edition if the file exists.
-- Walks the issue directory recursively and replaces embedded date strings in `.pdf` and `.jp2` files.
-- Renames the issue directory to match the new date and edition.
-- Updates `BATCH.xml` by replacing the `issueDate`, `editionOrder`, and path date values, then deletes `BATCH_1.xml` if present.
-- Add, replace, or delete a questionable `mods:dateIssued` value in the METS XML.
+- Only some of `-d`, `-e`, `-D`, `-E` are provided; full date/edition changes require all four values.
+- None of the date/edition or questionable-date options are provided.
+- `from-date/from-edition` and `to-date/to-edition` are identical.
+- `from-questionable` and `to-questionable` are identical.
+- The issue directory name does not end with a 10-digit `YYYYMMDDEE` suffix.
+- The source METS file required for the selected mode does not exist.
+- A specified `from-questionable` value is not found as a questionable date in the METS file.
+- `-Q` is used without `-q` when a questionable date already exists in the METS file.
+- A destination METS file, destination PDF, or destination issue directory already exists during a full rename operation.
 
 ## Dry run
 
-A dry-run mode is useful for verifying planned file operations before making destructive changes. File writes, deletes, and renames are routed through helper functions that log actions instead of executing them.
+Use `-n` or `--dry-run` to preview changes.
 
-## How filenames are derived
+Example:
 
-The script formats dates in two ways:
+```bash
+python3 change-date \
+  -b /data/batches/batch_curiv_delilahbeasley \
+  -i /data/batches/batch_curiv_delilahbeasley/sn88086183/00516992189/1948010201 \
+  -d 1948-01-02 \
+  -e 1 \
+  -D 1947-01-02 \
+  -E 2 \
+  -n
+```
 
-- `YYYY-MM-DD` for text replacement inside XML and other file contents.
-- `YYYYMMDD` for issue filenames and directory names.
+Dry-run output is prefixed with `[DRY-RUN]`; normal execution is prefixed with `[RUN]`.
 
-Editions are zero-padded to two digits, so edition `1` becomes `01` and edition `2` becomes `02`.
+## Notes
 
-That means:
+- XML output is serialized with `ElementTree.tostring()`, so formatting and whitespace may differ from the original source even when the XML content is unchanged semantically.
+- This script performs destructive actions such as deleting files, modifying binary files, and renaming paths, so `--dry-run` is strongly recommended before running it against production data.
 
-- `from-date 1901-01-01` becomes `19010101`
-- `from-edition 1` becomes `01`
-- The issue stem becomes `1901010101`
+## Testing checklist
+
+Before using this in production, test at least these cases against sample data:
+
+- Full date/edition rename.
+- `-q` only, delete questionable date.
+- `-q` + `-Q`, replace questionable date.
+- `-Q` only, add questionable date.
+- Dry-run output for each mode.
+- Collision handling when destination files or directories already exist.
 
 ## Files affected
 
@@ -136,14 +170,6 @@ Depending on what exists in the issue directory and batch directory, the script 
 - `<batch_path>/BATCH_1.xml`
 
 The issue directory itself will also be renamed from a  `YYYYMMDDEE` pattern to the target date and edition value.
-
-## Exit behavior
-
-The script will terminate with an error if a required directory is missing, if a date is invalid, or if an edition is less than 1. Files that are optional are guarded with existence checks before delete or rename operations.
-
-## Notes and cautions
-
-- This script performs destructive actions such as deleting files, modifying binary files, and renaming paths, so `--dry-run` is strongly recommended before running it against production data.
 
 ## Future improvements
 

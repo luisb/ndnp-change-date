@@ -371,7 +371,7 @@ def main():
     batch_xml_1_path = batch_path / "BATCH_1.xml"
 
     # Ensure from_questionable exists as questionable date
-    if from_questionable:
+    if is_questionable_change:
         if not src_mets_path.exists():
             parser.error(f"Source METS file does not exist: {src_mets_path}")
 

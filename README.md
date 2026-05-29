@@ -150,10 +150,10 @@ Dry-run output is prefixed with `[DRY-RUN]`; normal execution is prefixed with `
 
 Before using this in production, test at least these cases against sample data:
 
-- Full date/edition rename.
-- `-q` only, delete questionable date.
-- `-q` + `-Q`, replace questionable date.
+- Full date/edition change.
 - `-Q` only, add questionable date.
+- `-q` + `-Q`, replace questionable date.
+- `-q` only, delete questionable date.
 - Dry-run output for each mode.
 - Collision handling when destination files or directories already exist.
 

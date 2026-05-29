@@ -284,7 +284,14 @@ def main():
         parser.error(
             "When using date/edition changes, -d, -e, -D, and -E must all be provided.")
 
-    if args.from_date is not None:
+    is_date_change = all(date_args_present)
+    is_questionable_change = (args.from_questionable is not None or args.to_questionable is not None)
+
+    if not is_date_change and not is_questionable_change:
+        parser.error(
+            "Nothing to do. Provide -d/-e/-D/-E for a date change and/or -q/-Q for questionable-date changes.")
+
+    if is_date_change:
         if args.from_date == args.to_date and args.from_edition == args.to_edition:
             parser.error(
                 "The to_date and to_edition cannot be the same values as the "
@@ -323,7 +330,7 @@ def main():
     to_questionable = (args.to_questionable.strftime("%Y-%m-%d")
                        if args.to_questionable else None)
     
-    if from_date_path:
+    if is_date_change:
         src_mets_path = issue_path / f"{from_date_path}{from_edition}.xml"
         dst_mets_path = issue_path / f"{to_date_path}{to_edition}.xml"
 
@@ -332,7 +339,7 @@ def main():
         src_issue_pdf_path = issue_path / f"{from_date_path}{from_edition}.pdf"
         dst_issue_pdf_path = issue_path / f"{to_date_path}{to_edition}.pdf"
 
-        new_issue_name = re.sub(r"\d{10}$", to_date_path + to_edition, issue_path.name)
+        new_issue_name = issue_path.name[:-10] + to_date_path + to_edition
         new_issue_path = issue_path.with_name(new_issue_name)
 
         # Complete destination collision checks before modifying data
@@ -358,7 +365,7 @@ def main():
             )
         
         src_mets_path = mets_files[0]
-        src_mets_path_1 = Path(re.sub(r"\.xml$", "_1.xml", str(mets_files[0])))
+        src_mets_path_1 = src_mets_path.with_name(f"{src_mets_path.stem}_1.xml")
 
     batch_xml_path = batch_path / "BATCH.xml"
     batch_xml_1_path = batch_path / "BATCH_1.xml"
@@ -386,15 +393,15 @@ def main():
     
     # METS file
     if src_mets_path.exists():
-        if from_date:
+        if is_date_change:
             data = build_updated_mets_xml(
-                src_mets_path,
-                from_date,
-                to_date,
-                from_edition,
-                to_edition,
-                from_questionable,
-                to_questionable
+                src_path=src_mets_path,
+                from_date=from_date,
+                to_date=to_date,
+                from_edition=from_edition,
+                to_edition=to_edition,
+                from_questionable=from_questionable,
+                to_questionable=to_questionable
             )
             write_text_file(dst_mets_path, data, args.dry_run, stats)
             delete_file(src_mets_path, args.dry_run, stats)
@@ -410,14 +417,11 @@ def main():
     delete_file(src_mets_path_1, args.dry_run, stats)
 
     # Issue PDF file
-    try:
-        if src_issue_pdf_path:
-            rename_path(src_issue_pdf_path, dst_issue_pdf_path, args.dry_run, stats)
-    except UnboundLocalError:
-        pass
-
+    if is_date_change:
+        rename_path(src_issue_pdf_path, dst_issue_pdf_path, args.dry_run, stats)
+        
     # Update dates in .pdf and .jp2 files
-    if from_date and to_date:
+    if is_date_change:
         files = list(issue_path.rglob("*.pdf")) + list(issue_path.rglob("*.jp2"))
         old_bytes = from_date.encode("ascii")
         new_bytes = to_date.encode("ascii")
@@ -429,7 +433,7 @@ def main():
         rename_path(issue_path, new_issue_path, args.dry_run, stats)
 
     # BATCH.xml file
-    if from_date:
+    if is_date_change:
         if batch_xml_path.exists():
             data = build_updated_batch_xml(
                 batch_xml_path,
@@ -442,8 +446,8 @@ def main():
             )
             write_text_file(batch_xml_path, data, args.dry_run, stats, overwrite=True)
 
-    # Delete BATCH_1.xml
-    delete_file(batch_xml_1_path, args.dry_run, stats)
+        # Delete BATCH_1.xml
+        delete_file(batch_xml_1_path, args.dry_run, stats)
 
     log_action(
         "summary: "

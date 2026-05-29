@@ -39,15 +39,15 @@ Use `-d`, `-e`, `-D`, and `-E` together. All four options are required for this 
 This mode:
 
 - Updates the root METS `LABEL` when it contains the old date.
-- Updates non-questionable `mods:dateIssued` values in the issue METS XML.
+- Updates `mods:dateIssued` values in the issue METS XML, but not questionable dates.
 - Updates the edition number in `mods:detail[@type='edition']/mods:number`.
 - Writes a new METS file named for the destination date/edition.
-- Deletes the old METS file.
-- Deletes the old `_1.xml` METS sidecar if present.
+- Deletes the existing METS file.
+- Deletes the existing `_1.xml` validation file if present.
 - Renames the issue PDF if present.
-- Replaces embedded old-date byte strings with the new date inside `.pdf` and `.jp2` files beneath the issue directory.
-- Renames the issue directory to match the new `YYYYMMDDNN` suffix.
-- Updates the matching `<issue>` entry in `BATCH.xml`.
+- Replaces the old date with the new date in the metadata of `.pdf` and `.jp2` files in the same issue directory.
+- Renames the issue directory to match the new `YYYYMMDDEE` format.
+- Updates the matching `<issue>` line in `BATCH.xml`.
 - Deletes `BATCH_1.xml` if present.
 
 Example:
@@ -97,7 +97,7 @@ python3 change-date.py \
 
 Use `-Q` by itself.
 
-This mode adds a new `mods:dateIssued qualifier="questionable" encoding="iso8601"` element after the first non-questionable `mods:dateIssued` entry when possible. If no normal `dateIssued` exists, the new element is appended under `mods:originInfo`.
+This mode adds a new `mods:dateIssued encoding="iso8601" qualifier="questionable"` element after the first non-questionable `mods:dateIssued` entry when possible. If no normal `dateIssued` exists, the new element is appended under `mods:originInfo`.
 
 Example:
 
@@ -116,7 +116,7 @@ The script stops with an error in these cases:
 - None of the date/edition or questionable-date options are provided.
 - `from-date/from-edition` and `to-date/to-edition` are identical.
 - `from-questionable` and `to-questionable` are identical.
-- The issue directory name does not end with a 10-digit `YYYYMMDDEE` suffix.
+- The issue directory name does not end with `YYYYMMDDEE`.
 - The source METS file required for the selected mode does not exist.
 - A specified `from-questionable` value is not found as a questionable date in the METS file.
 - `-Q` is used without `-q` when a questionable date already exists in the METS file.

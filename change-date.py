@@ -411,7 +411,7 @@ def main():
                 from_questionable=from_questionable,
                 to_questionable=to_questionable
             )
-            write_text_file(src_mets_path, data, args.dry_run, stats,overwrite=True)
+            write_text_file(src_mets_path, data, args.dry_run, stats, overwrite=True)
 
     # Delete old METS _1.xml file
     delete_file(src_mets_path_1, args.dry_run, stats)

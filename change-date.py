@@ -274,7 +274,7 @@ def build_updated_batch_xml(
     old_stem = f"{from_date_path}{from_edition}"
     new_stem = f"{to_date_path}{to_edition}"
 
-    for issue in root.findall(".//ndnp:issue", NS):
+    for issue in root.findall(".//issue", NS):
         issue_date = issue.get("issueDate")
         edition_order = issue.get("editionOrder")
         issue_text = issue.text or ""

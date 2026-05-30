@@ -56,7 +56,7 @@ def valid_int(num) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="change-date",
-        description="Change date of an issue in an NDNP batch",
+        description="Change date of an issue in an NDNP batch and/or manage questionable dates.",
     )
 
     parser.add_argument("-b", "--batch-path", type=valid_path_directory, required=True)
@@ -146,6 +146,41 @@ def batch_xml_to_text(root: ET.Element) -> str:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
 
+def validate_issue_identity(issue_path: Path, from_date_path: str, from_edition: str) -> None:
+    issue_suffix = issue_path.name[-10:]
+    expected = f"{from_date_path}{from_edition}"
+
+    if issue_suffix != expected:
+        raise ValueError(
+            "The issue directory does not match --from-date/--from-edition: "
+            f'the issue directory is "{issue_suffix}", but expected "{expected}".')
+
+
+def validate_mets_date_and_edition(
+        src_path: Path,
+        expected_date: str,
+        expected_edition: str) -> tuple[bool, bool]:
+    
+    tree = ET.parse(src_path)
+    root = tree.getroot()
+
+    found_date = False
+    found_edition = False
+
+    for elem in root.findall(".//mods:originInfo/mods:dateIssued", NS):
+        if elem.get("qualifier") == "questionable":
+            continue
+        if elem.text == expected_date:
+            found_date = True
+            break
+
+    edition_elem = root.find(".//mods:detail[@type='edition']/mods:number", NS)
+    if edition_elem is not None and edition_elem.text == str(int(expected_edition)):
+        found_edition = True
+
+    return found_date, found_edition
+
+
 def build_updated_mets_xml(
     src_path: Path,
     from_date: Optional[str] = None,
@@ -221,6 +256,7 @@ def build_updated_mets_xml(
                         origin_info.append(new_elem)
 
     return mets_xml_to_text(root)
+
 
 def build_updated_batch_xml(
     src_path: Path,
@@ -335,6 +371,11 @@ def main():
                        if args.to_questionable else None)
     
     if is_date_change:
+        try: 
+            validate_issue_identity(issue_path, from_date_path, from_edition)
+        except ValueError as e:
+            parser.error(str(e))
+
         src_mets_path = issue_path / f"{from_date_path}{from_edition}.xml"
         dst_mets_path = issue_path / f"{to_date_path}{to_edition}.xml"
 
@@ -345,6 +386,27 @@ def main():
 
         new_issue_name = issue_path.name[:-10] + to_date_path + to_edition
         new_issue_path = issue_path.with_name(new_issue_name)
+        
+        if not src_mets_path.exists():
+            parser.error(f"Source METS file does not exist: {src_mets_path}."
+                         "This path is derived from --from-date/--from-edition, so verify those "
+                         "values match the issue directory and source METS name.")
+
+        found_date, found_edition = validate_mets_date_and_edition(
+            src_path=src_mets_path,
+            expected_date=from_date,
+            expected_edition=from_edition)
+        
+        if not found_date and not found_edition:
+            parser.error(f'Neither from_date "{from_date}" nor from_edition "{int(from_edition)}" '
+                            f'was found in {src_mets_path}.')
+        elif not found_date:
+            parser.error(f'The from_date "{from_date}" was not found as a non-questionable '
+                            f'dateIssued in {src_mets_path}.')
+        elif not found_edition:
+            parser.error(
+                f'The from_edition "{int(found_edition)}" was not found in {src_mets_path}.'
+            )
 
         # Complete destination collision checks before modifying data
         if src_mets_path.exists():
@@ -355,8 +417,7 @@ def main():
 
         if new_issue_path != issue_path:
             ensure_missing(new_issue_path, "Destination issue directory")
-
-
+        
     else:
         mets_files = [
             p for p in issue_path.glob("*.xml")
@@ -465,3 +526,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

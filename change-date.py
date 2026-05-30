@@ -182,6 +182,29 @@ def validate_mets_date_and_edition(
     return found_date, found_edition
 
 
+def batch_has_exact_issue(
+    src_path: Path,
+    expected_date: str,
+    expected_edition: str,
+    expected_stem: str) -> bool:
+
+    tree = ET.parse(src_path)
+    root = tree.getroot()
+
+    for issue in root.findall(".//issue", NS):
+        issue_date = issue.get("issueDate")
+        edition_order = issue.get("editionOrder")
+        issue_text = (issue.text or "").strip()
+
+        if (issue_date == expected_date
+            and edition_order == str(int(expected_edition))
+            and expected_stem in issue_text):
+
+            return True
+
+    return False
+
+
 def build_updated_mets_xml(
     src_path: Path,
     from_date: Optional[str] = None,
@@ -357,6 +380,9 @@ def main():
     batch_path = args.batch_path
     issue_path = args.issue_path
 
+    batch_xml_path = batch_path / "BATCH.xml"
+    batch_xml_1_path = batch_path / "BATCH_1.xml"
+
     from_date = args.from_date.strftime("%Y-%m-%d") if args.from_date else None
     from_date_path = args.from_date.strftime("%Y%m%d") if args.from_date else None
     from_edition = f"{args.from_edition:02d}" if args.from_edition else None
@@ -418,6 +444,23 @@ def main():
 
         if new_issue_path != issue_path:
             ensure_missing(new_issue_path, "Destination issue directory")
+
+        if not batch_xml_path.exists():
+            parser.error(f"BATCH.xml file does not exist: {batch_xml_path}")
+
+        expected_stem = f"{from_date_path}{from_edition}"
+
+        if not batch_has_exact_issue(
+            batch_xml_path,
+            from_date,
+            from_edition,
+            expected_stem):
+
+            parser.error(
+                f"No exact matching issue entry was found in {batch_xml_path} for "
+                f'issueDate="{from_date}", editionOrder="{int(from_edition)}", '
+                f'and issue path containing "{expected_stem}".'
+            )
         
     else:
         mets_files = [
@@ -432,9 +475,6 @@ def main():
         
         src_mets_path = mets_files[0]
         src_mets_path_1 = src_mets_path.with_name(f"{src_mets_path.stem}_1.xml")
-
-    batch_xml_path = batch_path / "BATCH.xml"
-    batch_xml_1_path = batch_path / "BATCH_1.xml"
 
     # Ensure from_questionable exists as questionable date
     if from_questionable:

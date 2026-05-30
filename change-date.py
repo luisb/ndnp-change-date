@@ -247,8 +247,12 @@ def build_updated_batch_xml(
             issue.set("editionOrder", str(int(to_edition)))
             issue.text = issue_text.replace(old_stem, new_stem)
             break
+    
+    # Clean up ndnp: namespaces in XML
+    xml_str = batch_xml_to_text(root)
+    xml_str = xml_str.replace("ndnp:", "")
 
-    return batch_xml_to_text(root)
+    return xml_str
 
 
 def mets_has_questionable_date(src_path: Path, target_date: str) -> bool:

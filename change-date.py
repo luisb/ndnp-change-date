@@ -153,7 +153,8 @@ def validate_issue_identity(issue_path: Path, from_date_path: str, from_edition:
     if issue_suffix != expected:
         raise ValueError(
             "The issue directory does not match --from-date/--from-edition: "
-            f'the issue directory is "{issue_suffix}", but expected "{expected}".')
+            f'the issue directory is "{issue_suffix}", but with --from-date/--from-edition '
+            f'expected "{expected}".')
 
 
 def validate_mets_date_and_edition(
@@ -388,7 +389,7 @@ def main():
         new_issue_path = issue_path.with_name(new_issue_name)
         
         if not src_mets_path.exists():
-            parser.error(f"Source METS file does not exist: {src_mets_path}."
+            parser.error(f"Source METS file does not exist: {src_mets_path}. "
                          "This path is derived from --from-date/--from-edition, so verify those "
                          "values match the issue directory and source METS name.")
 
@@ -405,7 +406,7 @@ def main():
                             f'dateIssued in {src_mets_path}.')
         elif not found_edition:
             parser.error(
-                f'The from_edition "{int(found_edition)}" was not found in {src_mets_path}.'
+                f'The from_edition "{int(from_edition)}" was not found in {src_mets_path}.'
             )
 
         # Complete destination collision checks before modifying data
@@ -526,4 +527,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

@@ -397,6 +397,12 @@ def main():
     to_questionable = (args.to_questionable.strftime("%Y-%m-%d")
                        if args.to_questionable else None)
     
+    dry_run = args.dry_run
+    verbose = args.verbose
+
+    date_args = [from_date, from_edition, to_date, to_edition]
+    date_args_present = [value is not None for value in date_args]
+    
     if is_date_change:
         try: 
             validate_issue_identity(issue_path, from_date_path, from_edition)

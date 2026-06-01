@@ -71,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Specify questionable date to add or change to")
     parser.add_argument("-n", "--dry-run", action="store_true",
                         help="Show what would change without modifying any files")
+    parser.add_argument("-v", "--verbose", action="store_true", 
+                        help="Show additional messages in output")
 
     return parser
 
@@ -149,7 +151,7 @@ def batch_xml_to_text(root: ET.Element) -> str:
 def validate_issue_identity(issue_path: Path, from_date_path: str, from_edition: str) -> None:
     issue_suffix = issue_path.name[-10:]
     expected = f"{from_date_path}{from_edition}"
-
+    
     if issue_suffix != expected:
         raise ValueError(
             "The issue directory does not match --from-date/--from-edition: "
@@ -160,8 +162,10 @@ def validate_issue_identity(issue_path: Path, from_date_path: str, from_edition:
 def validate_mets_date_and_edition(
         src_path: Path,
         expected_date: str,
-        expected_edition: str) -> tuple[bool, bool]:
-    
+        expected_edition: str, 
+        dry_run: bool,
+        verbose: bool) -> tuple[bool, bool]:
+
     tree = ET.parse(src_path)
     root = tree.getroot()
 
@@ -172,13 +176,21 @@ def validate_mets_date_and_edition(
         if elem.get("qualifier") == "questionable":
             continue
         if elem.text == expected_date:
+            if verbose:
+                log_action(f'[VERBOSE] found non-questionable dateIssued element with value "{expected_date}".', dry_run)
             found_date = True
             break
 
     edition_elem = root.find(".//mods:detail[@type='edition']/mods:number", NS)
     if edition_elem is not None and edition_elem.text == str(int(expected_edition)):
+        if verbose:
+            log_action(f'[VERBOSE] found edition number element with value "{str(int(expected_edition))}".', dry_run)
         found_edition = True
 
+    if not found_date and verbose:
+        log_action(f'[VERBOSE] did not find non-questionable dateIssued element with value "{expected_date}".', dry_run)
+    if not found_edition and verbose:
+        log_action(f'[VERBOSE] did not find edition number element with value "{str(int(expected_edition))}".', dry_run)
     return found_date, found_edition
 
 
@@ -186,12 +198,16 @@ def batch_has_exact_issue(
     src_path: Path,
     expected_date: str,
     expected_edition: str,
-    expected_stem: str) -> bool:
+    expected_stem: str, 
+    dry_run: bool,
+    verbose: bool) -> bool:
 
     tree = ET.parse(src_path)
     root = tree.getroot()
 
     issues = root.findall(".//ndnp:issue", NS)
+    if verbose:
+        log_action(f'[VERBOSE] found {len(issues)} issue entries in BATCH.xml.', dry_run)
         issue_date = issue.get("issueDate")
         edition_order = issue.get("editionOrder")
         issue_text = (issue.text or "").strip()
@@ -199,7 +215,9 @@ def batch_has_exact_issue(
         if (issue_date == expected_date
             and edition_order == str(int(expected_edition))
             and expected_stem in issue_text):
-
+            if verbose:
+                log_action(f'[VERBOSE] found matching issue entry with issueDate="{issue_date}", editionOrder="{str(int(edition_order))}", '
+                           f'and issue text containing "{expected_stem}".', dry_run)
             return True
 
     return False
@@ -212,7 +230,9 @@ def build_updated_mets_xml(
     from_edition: Optional[str] = None,
     to_edition: Optional[str] = None,
     from_questionable: Optional[str] = None,
-    to_questionable: Optional[str] = None) -> str:
+    to_questionable: Optional[str] = None, 
+    dry_run: bool = False,
+    verbose: bool = False) -> str:
 
     tree = ET.parse(src_path)
     root = tree.getroot()
@@ -223,21 +243,34 @@ def build_updated_mets_xml(
     # Update LABEL attribute on root <mets> element
     if from_date and to_date:
         label = root.get("LABEL")
+        if label and verbose:
+            log_action(f'[VERBOSE] LABEL attribute found: "{label}".', dry_run)
         if label and from_date in label:
+            if verbose:
+                log_action(f'[VERBOSE] updating LABEL attribute {from_date} -> {to_date}.', dry_run)
             root.set("LABEL", label.replace(from_date, to_date))
 
         # Update only non-questionable MODS:dateIssued values
         for elem in root.findall(".//mods:originInfo/mods:dateIssued", NS):
+            if verbose:
+                log_action(f'[VERBOSE] found {len(root.findall(".//mods:originInfo/mods:dateIssued", NS))} '
+                           f'dateIssued {"element" if len(root.findall(".//mods:originInfo/mods:dateIssued", NS)) == 1 else "elements"}.', dry_run)
             qualifier = elem.get("qualifier")
             if qualifier == "questionable":
+                if verbose:
+                    log_action(f'[VERBOSE] skipping dateIssued element with qualifier "questionable" and value "{elem.text}".', dry_run)
                 continue
             if elem.text == from_date:
+                if verbose:
+                    log_action(f'[VERBOSE] updating dateIssued element value {from_date} -> {to_date}.', dry_run)
                 elem.text = to_date
 
     # Update edition number
     if from_edition and to_edition:
         edition_elem = root.find(".//mods:detail[@type='edition']/mods:number", NS)
         if edition_elem is not None and edition_elem.text == str(int(from_edition)):
+            if verbose:
+                log_action(f'[VERBOSE] updating edition number {from_edition} -> {to_edition}.', dry_run)
             edition_elem.text = str(int(to_edition))
 
     # Handle questionable dateIssued
@@ -246,6 +279,8 @@ def build_updated_mets_xml(
             questionable_elem = None
             normal_elem = None
 
+            if verbose:
+                log_action(f'[VERBOSE] searching for questionable dateIssued elements to update, delete, or add.', dry_run)
             for elem in origin_info.findall("mods:dateIssued", NS):
                 if elem.get("qualifier") == "questionable":
                     if from_questionable is None or elem.text == from_questionable:
@@ -256,11 +291,15 @@ def build_updated_mets_xml(
             # Case 1: -q only -> delete matching questionable date
             if from_questionable and not to_questionable:
                 if questionable_elem is not None and questionable_elem.text == from_questionable:
+                    if verbose:
+                        log_action(f'[VERBOSE] removing questionable dateIssued element with value "{from_questionable}".', dry_run)
                     origin_info.remove(questionable_elem)
 
             # Case 2: -q and -Q -> change matching questionable date
             elif from_questionable and to_questionable:
                 if questionable_elem is not None and questionable_elem.text == from_questionable:
+                    if verbose:
+                        log_action(f'[VERBOSE] updating questionable dateIssued element value {from_questionable} -> {to_questionable}.', dry_run)
                     questionable_elem.text = to_questionable
 
             # Case 3: -Q only -> add questionable date after normal dateIssued
@@ -272,6 +311,8 @@ def build_updated_mets_xml(
                     })
                     new_elem.text = to_questionable
 
+                    if verbose:
+                        log_action(f'[VERBOSE] adding new questionable dateIssued element with value "{to_questionable}".', dry_run)
                     if normal_elem is not None:
                         children = list(origin_info)
                         insert_at = children.index(normal_elem) + 1
@@ -289,7 +330,9 @@ def build_updated_batch_xml(
     from_date_path: str,
     to_date_path: str,
     from_edition: str,
-    to_edition: str) -> str:
+    to_edition: str, 
+    dry_run: bool, 
+    verbose: bool) -> str:
 
     tree = ET.parse(src_path)
     root = tree.getroot()
@@ -298,84 +341,63 @@ def build_updated_batch_xml(
     new_stem = f"{to_date_path}{to_edition}"
 
     issues = root.findall(".//ndnp:issue", NS)
+    if verbose:
+        log_action(f'[VERBOSE] found {len(issues)} issue entries in BATCH.xml.', dry_run)
+
         issue_date = issue.get("issueDate")
         edition_order = issue.get("editionOrder")
         issue_text = issue.text or ""
 
         if issue_date == from_date and edition_order == str(int(from_edition)):
+            if verbose:
+                log_action(f'[VERBOSE] updating issue entry with issueDate="{from_date}" -> "{to_date}", '
+                           f'editionOrder="{str(int(from_edition))}" -> "{str(int(to_edition))}", '
+                           f'and issue text containing "{old_stem}" -> "{new_stem}".', dry_run)
             issue.set("issueDate", to_date)
             issue.set("editionOrder", str(int(to_edition)))
             issue.text = issue_text.replace(old_stem, new_stem)
             break
     
     # Clean up ndnp: namespaces in XML
+    if verbose:
+        log_action(f'[VERBOSE] removing "ndnp:" namespace prefixes from BATCH.xml.', dry_run)
     xml_str = batch_xml_to_text(root)
     xml_str = xml_str.replace("ndnp:", "")
 
     return xml_str
 
 
-def mets_has_questionable_date(src_path: Path, target_date: str) -> bool:
+def mets_has_questionable_date(src_path: Path, target_date: str, dry_run: bool, verbose: bool) -> bool:
     tree = ET.parse(src_path)
     root = tree.getroot()
 
     for elem in root.findall(".//mods:originInfo/mods:dateIssued", NS):
         if elem.get("qualifier") == "questionable" and elem.text == target_date:
+            if verbose:
+                log_action(f'[VERBOSE] found questionable dateIssued element with value "{target_date}".', dry_run)
             return True
-        
+    if verbose:
+        log_action(f'[VERBOSE] did not find questionable dateIssued element with value "{target_date}".', dry_run)
     return False
 
 
-def mets_has_any_questionable_date(src_path: Path) -> bool:
+def mets_has_any_questionable_date(src_path: Path, dry_run: bool, verbose: bool) -> bool:
     tree = ET.parse(src_path)
     root = tree.getroot()
 
     for elem in root.findall(".//mods:originInfo/mods:dateIssued", NS):
         if elem.get("qualifier") == "questionable":
+            if verbose:
+                log_action(f'[VERBOSE] found questionable dateIssued element with value "{elem.text}".', dry_run)
             return True
-        
+    if verbose:
+        log_action(f'[VERBOSE] did not find any questionable dateIssued elements.', dry_run)
     return False
 
 
 def main():
     parser = build_parser()
     args = parser.parse_args()
-
-    date_args = [args.from_date, args.from_edition, args.to_date, args.to_edition]
-    date_args_present = [value is not None for value in date_args]
-    
-    if any(date_args_present) and not all(date_args_present):
-        parser.error(
-            "When using date/edition changes, -d, -e, -D, and -E must all be provided.")
-
-    is_date_change = all(date_args_present)
-    is_questionable_change = (args.from_questionable is not None or args.to_questionable is not None)
-
-    if not is_date_change and not is_questionable_change:
-        parser.error(
-            "Nothing to do. Provide -d/-e/-D/-E for a date change and/or -q/-Q for questionable-date changes.")
-
-    if is_date_change:
-        if args.from_date == args.to_date and args.from_edition == args.to_edition:
-            parser.error(
-                "The to_date and to_edition cannot be the same values as the "
-                "from_date and from_edition.")
-    
-    # Ensure issue directory is in the format YYYYMMDDEE
-    if not re.search(r"\d{10}$", args.issue_path.name):
-        parser.error(f"Issue directory name does not end with YYYYMMDDEE: {args.issue_path.name}")
-
-    if (args.from_questionable
-        and args.to_questionable
-        and args.from_questionable == args.to_questionable):
-        parser.error("The to_questionable date cannot be the same as the from_questionable date.")
-
-    stats = {
-        "written": 0,
-        "deleted": 0,
-        "renamed": 0,
-        "updated": 0,
-    }
 
     batch_path = args.batch_path
     issue_path = args.issue_path
@@ -403,8 +425,34 @@ def main():
     date_args = [from_date, from_edition, to_date, to_edition]
     date_args_present = [value is not None for value in date_args]
     
+    if verbose:
+        log_action(f'[VERBOSE] check if any date options are given, all date options are given.', dry_run)
+    
+    if is_date_change and not is_questionable_change and verbose:
+        log_action(f'[VERBOSE] date change operation detected.', dry_run)
+
+    if is_questionable_change and not is_date_change and verbose:
+        log_action(f'[VERBOSE] questionable date operation detected.', dry_run)
+
+    if is_date_change and is_questionable_change and verbose:
+        log_action(f'[VERBOSE] date change and questionable date operations detected.', dry_run)
+    
+    if is_date_change:
+        if verbose:
+            log_action(f'[VERBOSE] checking from_date "{from_date}" and edition "{str(int(from_edition))}" '
+                       f'is not the same as to_date "{to_date}" and edition "{str(int(to_edition))}".', dry_run)
+    
+    if verbose:
+        log_action(f'[VERBOSE] check that the issue directory ends in 10 digits', dry_run)
+    
+    if from_questionable and verbose:
+        log_action(f'[VERBOSE] checking that from_questionable date "{from_questionable} is not the same as '
+                   f'to_questionable date "{to_questionable}".', dry_run)
+    
     if is_date_change:
         try: 
+            if verbose:
+                log_action(f'[VERBOSE] checking issue directory "{issue_path.name[-10:]} matches from_date and edition "{from_date_path}{from_edition}".', dry_run)
             validate_issue_identity(issue_path, from_date_path, from_edition)
         except ValueError as e:
             parser.error(str(e))
@@ -420,15 +468,21 @@ def main():
         new_issue_name = issue_path.name[:-10] + to_date_path + to_edition
         new_issue_path = issue_path.with_name(new_issue_name)
         
+        if verbose:
+            log_action(f'[VERBOSE] checking if METS file "{src_mets_path}" exists', dry_run)
         if not src_mets_path.exists():
             parser.error(f"Source METS file does not exist: {src_mets_path}. "
                          "This path is derived from --from-date/--from-edition, so verify those "
                          "values match the issue directory and source METS name.")
 
+        if verbose:
+            log_action(f'[VERBOSE] checking if from_date "{from_date}" and from_edition "{int(from_edition)}" are in the METS file.', dry_run)
         found_date, found_edition = validate_mets_date_and_edition(
             src_path=src_mets_path,
             expected_date=from_date,
-            expected_edition=from_edition)
+            expected_edition=from_edition,
+            dry_run=dry_run,
+            verbose=verbose)
         
         if not found_date and not found_edition:
             parser.error(f'Neither from_date "{from_date}" nor from_edition "{int(from_edition)}" '
@@ -441,6 +495,8 @@ def main():
                 f'The from_edition "{int(from_edition)}" was not found in {src_mets_path}.'
             )
 
+        if verbose:
+            log_action(f'[VERBOSE] checking there are no collisions for destination METS, issue PDF, and issue directory.', dry_run)
         # Complete destination collision checks before modifying data
         if src_mets_path.exists():
             ensure_missing(dst_mets_path, "Destination METS file")
@@ -451,16 +507,24 @@ def main():
         if new_issue_path != issue_path:
             ensure_missing(new_issue_path, "Destination issue directory")
 
+        if verbose:
+            log_action(f'[VERBOSE] checking "{batch_xml_path}" exists.', dry_run)
         if not batch_xml_path.exists():
             parser.error(f"BATCH.xml file does not exist: {batch_xml_path}")
 
         expected_stem = f"{from_date_path}{from_edition}"
 
+        if verbose:
+            log_action(f'[VERBOSE] checking that from_date "{from_date}, edition "{int(from_edition)}", and "{expected_stem}" '
+                       f'are in the BATCH.xml file.', dry_run)
+
         if not batch_has_exact_issue(
             batch_xml_path,
             from_date,
             from_edition,
-            expected_stem):
+            expected_stem,
+            dry_run,
+            verbose):
 
             parser.error(
                 f"No exact matching issue entry was found in {batch_xml_path} for "
@@ -469,11 +533,15 @@ def main():
             )
         
     else:
+        if verbose:
+            log_action(f'[VERBOSE] counting number of METS files in issue directory.', dry_run)
         mets_files = [
             p for p in issue_path.glob("*.xml")
             if p.is_file() and re.fullmatch(r"\d{10}\.xml", p.name)
         ]
-
+        if verbose:
+            file = f"file{'' if len(mets_files) == 1 else 's'}"
+            log_action(f'[VERBOSE] found {len(mets_files)} METS {file}.', dry_run)
         if len(mets_files) != 1:
             parser.error(
                 f"Expected exactly one METS file with a 10-digit name in {issue_path}, found {len(mets_files)}."
@@ -484,19 +552,27 @@ def main():
 
     # Ensure from_questionable exists as questionable date
     if from_questionable:
+        if verbose:
+            log_action(f'[VERBOSE] checking METS file "{src_mets_path}" exists.', dry_run)
         if not src_mets_path.exists():
             parser.error(f"Source METS file does not exist: {src_mets_path}")
 
+        if verbose:
+            log_action(f'[VERBOSE] checking METS contains from_questionable date "{from_questionable}".', dry_run)
         if not mets_has_questionable_date(src_mets_path, from_questionable):
             parser.error(f'The questionable date "{from_questionable}" was not found in {src_mets_path}.')
 
     # Ensure source METS exists for questionable-date operations
-    if args.from_questionable or args.to_questionable:
+    if verbose:
+        log_action(f'[VERBOSE] checking METS file "{src_mets_path}" exists.', dry_run)
+    if from_questionable or to_questionable:
         if not src_mets_path.exists():
             parser.error(f"Source METS file does not exist: {src_mets_path}")
 
     # If creating a questionable date, error if any questionable date already exists
-    if args.to_questionable and not args.from_questionable:
+    if to_questionable and not from_questionable:
+        if verbose:
+            log_action(f'[VERBOSE] checking if there is already a questionable date.', dry_run)
         if mets_has_any_questionable_date(src_mets_path):
             parser.error(
                 f'A questionable date already exists in {src_mets_path}; '
@@ -506,6 +582,8 @@ def main():
     # METS file
     if src_mets_path.exists():
         if is_date_change:
+            if verbose:
+                log_action(f'[VERBOSE] building new METS file.', dry_run)
             data = build_updated_mets_xml(
                 src_path=src_mets_path,
                 from_date=from_date,
@@ -513,40 +591,64 @@ def main():
                 from_edition=from_edition,
                 to_edition=to_edition,
                 from_questionable=from_questionable,
-                to_questionable=to_questionable
+                to_questionable=to_questionable,
+                dry_run=dry_run,
+                verbose=verbose
             )
-            write_text_file(dst_mets_path, data, args.dry_run, stats)
-            delete_file(src_mets_path, args.dry_run, stats)
+            if verbose:
+                log_action(f'[VERBOSE] writing METS file to "{dst_mets_path}".', dry_run)
+            write_text_file(dst_mets_path, data, dry_run, stats)
+            if verbose:
+                log_action(f'[VERBOSE] deleting "{src_mets_path}".', dry_run)
+            delete_file(src_mets_path, dry_run, stats)
         else:
+            if verbose:
+                log_action(f'[VERBOSE] building new METS file.', dry_run)
             data = build_updated_mets_xml(
                 src_path=src_mets_path,
                 from_questionable=from_questionable,
-                to_questionable=to_questionable
+                to_questionable=to_questionable,
+                dry_run=dry_run,
+                verbose=verbose
             )
-            write_text_file(src_mets_path, data, args.dry_run, stats, overwrite=True)
+            if verbose:
+                log_action(f'[VERBOSE] overwriting METS file "{src_mets_path}".', dry_run)
+            write_text_file(src_mets_path, data, dry_run, stats, overwrite=True)
 
     # Delete old METS _1.xml file
-    delete_file(src_mets_path_1, args.dry_run, stats)
+    if verbose:
+        log_action(f'[VERBOSE] deleting METS_1 file "{src_mets_path_1}".', dry_run)
+    delete_file(src_mets_path_1, dry_run, stats)
 
     # Issue PDF file
     if is_date_change:
-        rename_path(src_issue_pdf_path, dst_issue_pdf_path, args.dry_run, stats)
+        if verbose:
+            log_action(f'[VERBOSE] if issue PDF exists, renaming it to "{dst_issue_pdf_path}".', dry_run)
+        rename_path(src_issue_pdf_path, dst_issue_pdf_path, dry_run, stats)
         
     # Update dates in .pdf and .jp2 files
     if is_date_change:
+        if verbose:
+            log_action(f'[VERBOSE] updating *.pdf and *.jp2 files.', dry_run)
         files = list(issue_path.rglob("*.pdf")) + list(issue_path.rglob("*.jp2"))
         old_bytes = from_date.encode("ascii")
         new_bytes = to_date.encode("ascii")
 
         for file in files:
-            replace_bytes_file(file, old_bytes, new_bytes, args.dry_run, stats)
+            if verbose:
+                log_action(f'[VERBOSE] replacing "{from_date}" with "{to_date}" in file {file}.', dry_run)
+            replace_bytes_file(file, old_bytes, new_bytes, dry_run, stats)
 
         # Rename issue folder
-        rename_path(issue_path, new_issue_path, args.dry_run, stats)
+        if verbose:
+            log_action(f'[VERBOSE] renaming issue directory "{issue_path}" to "{new_issue_path}".', dry_run)
+        rename_path(issue_path, new_issue_path, dry_run, stats)
 
     # BATCH.xml file
     if is_date_change:
         if batch_xml_path.exists():
+            if verbose:
+                log_action(f'[VERBOSE] building new BATCH.xml file "{batch_xml_path}".', dry_run)
             data = build_updated_batch_xml(
                 batch_xml_path,
                 from_date,
@@ -555,11 +657,17 @@ def main():
                 to_date_path,
                 from_edition,
                 to_edition,
+                dry_run,
+                verbose
             )
-            write_text_file(batch_xml_path, data, args.dry_run, stats, overwrite=True)
+            if verbose:
+                log_action(f'[VERBOSE] overwriting BATCH.xml file to "{batch_xml_path}".', dry_run)
+            write_text_file(batch_xml_path, data, dry_run, stats, overwrite=True)
 
         # Delete BATCH_1.xml
-        delete_file(batch_xml_1_path, args.dry_run, stats)
+        if verbose:
+            log_action(f'[VERBOSE] deleting BATCH_1.xml file "{batch_xml_1_path}".', dry_run)
+        delete_file(batch_xml_1_path, dry_run, stats)
 
     log_action(
         "summary: "

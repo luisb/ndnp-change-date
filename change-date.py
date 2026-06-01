@@ -208,6 +208,7 @@ def batch_has_exact_issue(
     issues = root.findall(".//ndnp:issue", NS)
     if verbose:
         log_action(f'[VERBOSE] found {len(issues)} issue entries in BATCH.xml.', dry_run)
+    for issue in issues:
         issue_date = issue.get("issueDate")
         edition_order = issue.get("editionOrder")
         issue_text = (issue.text or "").strip()
@@ -344,6 +345,7 @@ def build_updated_batch_xml(
     if verbose:
         log_action(f'[VERBOSE] found {len(issues)} issue entries in BATCH.xml.', dry_run)
 
+    for issue in issues:
         issue_date = issue.get("issueDate")
         edition_order = issue.get("editionOrder")
         issue_text = issue.text or ""
@@ -427,7 +429,13 @@ def main():
     
     if verbose:
         log_action(f'[VERBOSE] check if any date options are given, all date options are given.', dry_run)
-    
+    if any(date_args_present) and not all(date_args_present):
+        parser.error(
+            "When using date/edition changes, -d, -e, -D, and -E must all be provided.")
+
+    is_date_change = all(date_args_present)
+    is_questionable_change = (from_questionable is not None or to_questionable is not None)
+
     if is_date_change and not is_questionable_change and verbose:
         log_action(f'[VERBOSE] date change operation detected.', dry_run)
 
@@ -436,19 +444,41 @@ def main():
 
     if is_date_change and is_questionable_change and verbose:
         log_action(f'[VERBOSE] date change and questionable date operations detected.', dry_run)
-    
+
+    if not is_date_change and not is_questionable_change:
+        parser.error(
+            "Nothing to do. Provide -d/-e/-D/-E for a date change and/or -q/-Q for questionable-date changes.")
+
     if is_date_change:
         if verbose:
             log_action(f'[VERBOSE] checking from_date "{from_date}" and edition "{str(int(from_edition))}" '
                        f'is not the same as to_date "{to_date}" and edition "{str(int(to_edition))}".', dry_run)
+        if from_date == to_date and from_edition == to_edition:
+            parser.error(
+                "The to_date and to_edition cannot be the same values as the "
+                "from_date and from_edition.")
     
+    # Ensure issue directory is in the format YYYYMMDDEE
     if verbose:
         log_action(f'[VERBOSE] check that the issue directory ends in 10 digits', dry_run)
-    
+    if not re.search(r"\d{10}$", issue_path.name):
+        parser.error(f"Issue directory name does not end with YYYYMMDDEE: {issue_path.name}")
+
     if from_questionable and verbose:
         log_action(f'[VERBOSE] checking that from_questionable date "{from_questionable} is not the same as '
                    f'to_questionable date "{to_questionable}".', dry_run)
-    
+    if (from_questionable
+        and to_questionable
+        and from_questionable == to_questionable):
+        parser.error("The to_questionable date cannot be the same as the from_questionable date.")
+
+    stats = {
+        "written": 0,
+        "deleted": 0,
+        "renamed": 0,
+        "updated": 0,
+    }
+
     if is_date_change:
         try: 
             if verbose:
@@ -675,7 +705,7 @@ def main():
         f"deleted={stats['deleted']}, "
         f"renamed={stats['renamed']}, "
         f"updated={stats['updated']}",
-        args.dry_run,
+        dry_run,
     )
 
 

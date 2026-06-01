@@ -121,8 +121,10 @@ def rename_path(src: Path, dst: Path, dry_run: bool, stats: dict) -> None:
         src.rename(dst)
 
 
-def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats: dict) -> None:
+def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats: dict, verbose: bool) -> None:
     if not path.exists():
+        if verbose:
+            log_action(f'[VERBOSE] The path "{path}" does not exist.')
         return
     
     data = path.read_bytes()
@@ -133,6 +135,9 @@ def replace_bytes_file(path: Path, old: bytes, new: bytes, dry_run: bool, stats:
 
         if not dry_run:
             path.write_bytes(new_data)
+    else:
+        if verbose:
+            log_action(f'[VERBOSE] No change required.', dry_run)
 
 
 def ensure_missing(path: Path, label: str) -> None:
@@ -589,7 +594,7 @@ def main():
 
         if verbose:
             log_action(f'[VERBOSE] checking METS contains from_questionable date "{from_questionable}".', dry_run)
-        if not mets_has_questionable_date(src_mets_path, from_questionable):
+        if not mets_has_questionable_date(src_mets_path, from_questionable, dry_run, verbose):
             parser.error(f'The questionable date "{from_questionable}" was not found in {src_mets_path}.')
 
     # Ensure source METS exists for questionable-date operations
@@ -603,7 +608,7 @@ def main():
     if to_questionable and not from_questionable:
         if verbose:
             log_action(f'[VERBOSE] checking if there is already a questionable date.', dry_run)
-        if mets_has_any_questionable_date(src_mets_path):
+        if mets_has_any_questionable_date(src_mets_path, dry_run, verbose):
             parser.error(
                 f'A questionable date already exists in {src_mets_path}; '
                 f'use -q to update it instead of adding another one.'
@@ -667,7 +672,7 @@ def main():
         for file in files:
             if verbose:
                 log_action(f'[VERBOSE] replacing "{from_date}" with "{to_date}" in file {file}.', dry_run)
-            replace_bytes_file(file, old_bytes, new_bytes, dry_run, stats)
+            replace_bytes_file(file, old_bytes, new_bytes, dry_run, stats, verbose)
 
         # Rename issue folder
         if verbose:

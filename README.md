@@ -174,4 +174,3 @@ The issue directory itself will also be renamed from a  `YYYYMMDDEE` pattern to 
 ## Future improvements
 
 - Add ability to import CSV file of date changes.
-- Add a `--verbose` flag for more detailed actions.

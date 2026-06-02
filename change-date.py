@@ -90,7 +90,7 @@ def write_text_file(path: Path, data: str, dry_run: bool, stats: dict, overwrite
     stats["written"] += 1
 
     if not dry_run:
-        path.write_text(data, encoding="utf-8")
+        path.write_text(data, encoding="UTF-8")
 
 
 def delete_file(path: Path, dry_run: bool, stats: dict) -> None:
@@ -146,11 +146,11 @@ def ensure_missing(path: Path, label: str) -> None:
 
 
 def mets_xml_to_text(root: ET.Element) -> str:
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    return ET.tostring(root, encoding="UTF-8", xml_declaration=True).decode("UTF-8")
 
 
 def batch_xml_to_text(root: ET.Element) -> str:
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    xml_str = ET.tostring(root, encoding="UTF-8", xml_declaration=True).decode("UTF-8")
 
 
 def validate_issue_identity(issue_path: Path, from_date_path: str, from_edition: str) -> None:

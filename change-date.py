@@ -152,6 +152,21 @@ def mets_xml_to_text(root: ET.Element) -> str:
 def batch_xml_to_text(root: ET.Element) -> str:
     xml_str = ET.tostring(root, encoding="UTF-8", xml_declaration=True).decode("UTF-8")
 
+    if 'xmlns:ndnp="http://www.loc.gov/ndnp"' not in xml_str:
+        xml_str = xml_str.replace(
+            '<batch ', 
+            '<batch xmlns:ndnp="http://www.loc.gov/ndnp" ',
+            1
+        )
+    
+    if 'xmlns="http://www.loc.gov/ndnp"' not in xml_str:
+        xml_str = xml_str.replace(
+            ' xsi:schemaLocation=',
+            ' xmlns="http://www.loc.gov/ndnp" xsi:schemaLocation='
+        )
+    
+    return xml_str
+
 
 def validate_issue_identity(issue_path: Path, from_date_path: str, from_edition: str) -> None:
     issue_suffix = issue_path.name[-10:]

@@ -291,7 +291,7 @@ def build_updated_mets_xml(
         edition_elem = root.find(".//mods:detail[@type='edition']/mods:number", NS)
         if edition_elem is not None and edition_elem.text == str(int(from_edition)):
             if verbose:
-                log_action(f'[VERBOSE] updating edition number {from_edition} -> {to_edition}.', dry_run)
+                log_action(f'[VERBOSE] updating edition number {str(int(from_edition))} -> {str(int(to_edition))}.', dry_run)
             edition_elem.text = str(int(to_edition))
 
     # Handle questionable dateIssued
@@ -380,7 +380,7 @@ def build_updated_batch_xml(
             issue.text = issue_text.replace(old_stem, new_stem)
             break
     
-    # Clean up ndnp: namespaces in XML
+    # Clean up ndnp: namespace prefixes in XML
     if verbose:
         log_action(f'[VERBOSE] removing "ndnp:" namespace prefixes from BATCH.xml.', dry_run)
     xml_str = batch_xml_to_text(root)

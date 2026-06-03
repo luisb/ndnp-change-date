@@ -225,7 +225,14 @@ def batch_has_exact_issue(
     tree = ET.parse(src_path)
     root = tree.getroot()
 
+    if verbose:
+        log_action(f'[VERBOSE] Searching for .//ndnp:issue', dry_run)
     issues = root.findall(".//ndnp:issue", NS)
+    if len(issues) == 0:
+        log_action(f'[VERBOSE] Found {len(issues)} issues.', dry_run)
+        log_action(f'[VERBOSE] Searching for .//issue', dry_run)
+        issues = root.findall(".//issue", NS)
+
     if verbose:
         log_action(f'[VERBOSE] found {len(issues)} issue entries in BATCH.xml.', dry_run)
     for issue in issues:
@@ -361,7 +368,14 @@ def build_updated_batch_xml(
     old_stem = f"{from_date_path}{from_edition}"
     new_stem = f"{to_date_path}{to_edition}"
 
+    if verbose:
+        log_action(f'[VERBOSE] Searching for .//ndnp:issue', dry_run)
     issues = root.findall(".//ndnp:issue", NS)
+    if len(issues) == 0:
+        log_action(f'[VERBOSE] Found {len(issues)} issues.', dry_run)
+        log_action(f'[VERBOSE] Searching for .//issue', dry_run)
+        issues = root.findall(".//issue", NS)
+        
     if verbose:
         log_action(f'[VERBOSE] found {len(issues)} issue entries in BATCH.xml.', dry_run)
 

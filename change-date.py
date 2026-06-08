@@ -245,7 +245,7 @@ def batch_has_exact_issue(
             and expected_stem in issue_text):
             if verbose:
                 log_action(f'[VERBOSE] found matching issue entry with issueDate="{issue_date}", editionOrder="{str(int(edition_order))}", '
-                           f'and issue text containing "{expected_stem}".', dry_run)
+                           f'and issue path containing "{expected_stem}".', dry_run)
             return True
 
     return False
@@ -499,7 +499,7 @@ def main():
         parser.error(f"Issue directory name does not end with YYYYMMDDEE: {issue_path.name}")
 
     if from_questionable and verbose:
-        log_action(f'[VERBOSE] checking that from_questionable date "{from_questionable} is not the same as '
+        log_action(f'[VERBOSE] checking that from_questionable date "{from_questionable}" is not the same as '
                    f'to_questionable date "{to_questionable}".', dry_run)
     if (from_questionable
         and to_questionable
@@ -580,7 +580,7 @@ def main():
 
         if verbose:
             log_action(f'[VERBOSE] checking that from_date "{from_date}, edition "{int(from_edition)}", and "{expected_stem}" '
-                       f'are in the BATCH.xml file.', dry_run)
+                       f'are in one line in the BATCH.xml file.', dry_run)
 
         if not batch_has_exact_issue(
             batch_xml_path,
@@ -604,11 +604,11 @@ def main():
             if p.is_file() and re.fullmatch(r"\d{10}\.xml", p.name)
         ]
         if verbose:
-            file = f"file{'' if len(mets_files) == 1 else 's'}"
+            file = f"{'file' if len(mets_files) == 1 else 'files'}"
             log_action(f'[VERBOSE] found {len(mets_files)} METS {file}.', dry_run)
         if len(mets_files) != 1:
             parser.error(
-                f"Expected exactly one METS file with a 10-digit name in {issue_path}, found {len(mets_files)}."
+                f"Expected exactly one METS file with a 10-digit name in {issue_path}; found {len(mets_files)}."
             )
         
         src_mets_path = mets_files[0]

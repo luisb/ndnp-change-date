@@ -241,7 +241,7 @@ def batch_has_exact_issue(
         issue_text = (issue.text or "").strip()
 
         if (issue_date == expected_date
-            and edition_order == str(int(expected_edition))
+            and int(edition_order) == int(expected_edition)
             and expected_stem in issue_text):
             if verbose:
                 log_action(f'[VERBOSE] found matching issue entry with issueDate="{issue_date}", editionOrder="{str(int(edition_order))}", '
@@ -384,7 +384,7 @@ def build_updated_batch_xml(
         edition_order = issue.get("editionOrder")
         issue_text = issue.text or ""
 
-        if issue_date == from_date and edition_order == str(int(from_edition)):
+        if issue_date == from_date and int(edition_order) == int(from_edition):
             if verbose:
                 log_action(f'[VERBOSE] updating issue entry with issueDate="{from_date}" -> "{to_date}", '
                            f'editionOrder="{str(int(from_edition))}" -> "{str(int(to_edition))}", '

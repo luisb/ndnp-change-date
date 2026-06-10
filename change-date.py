@@ -229,8 +229,9 @@ def batch_has_exact_issue(
         log_action(f'[VERBOSE] Searching for .//ndnp:issue', dry_run)
     issues = root.findall(".//ndnp:issue", NS)
     if len(issues) == 0:
-        log_action(f'[VERBOSE] Found {len(issues)} issues.', dry_run)
-        log_action(f'[VERBOSE] Searching for .//issue', dry_run)
+        if verbose:
+            log_action(f'[VERBOSE] Found {len(issues)} issues.', dry_run)
+            log_action(f'[VERBOSE] Searching for .//issue', dry_run)
         issues = root.findall(".//issue", NS)
 
     if verbose:

@@ -29,6 +29,7 @@ python3 change-date.py \
 | `-q`, `--from-questionable` | Existing questionable date to delete or replace. |
 | `-Q`, `--to-questionable` | New questionable date to add or replace with. |
 | `-n`, `--dry-run` | Show actions without writing, deleting, renaming, or modifying files. |
+| `-v`, `--verbose` | Display detailed runtime messages. |
 
 ## Modes
 

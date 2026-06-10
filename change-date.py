@@ -152,19 +152,8 @@ def mets_xml_to_text(root: ET.Element) -> str:
 def batch_xml_to_text(root: ET.Element) -> str:
     xml_str = ET.tostring(root, encoding="UTF-8", xml_declaration=True).decode("UTF-8")
 
-    if 'xmlns:ndnp="http://www.loc.gov/ndnp"' not in xml_str:
-        xml_str = xml_str.replace(
-            '<batch ', 
-            '<batch xmlns:ndnp="http://www.loc.gov/ndnp" ',
-            1
-        )
-    
-    if 'xmlns="http://www.loc.gov/ndnp"' not in xml_str:
-        xml_str = xml_str.replace(
-            ' xsi:schemaLocation=',
-            ' xmlns="http://www.loc.gov/ndnp" xsi:schemaLocation='
-        )
-    
+    xml_str = re.sub(r"<batch .*(?=name=)",'<batch xmlns:ndnp="http://www.loc.gov/ndnp" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.loc.gov/ndnp" xsi:schemaLocation="http://www.loc.gov/ndnp ./schema/ndnpBatch.xsd" ', xml_str)
+
     return xml_str
 
 

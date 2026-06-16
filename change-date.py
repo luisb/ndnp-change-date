@@ -150,11 +150,7 @@ def mets_xml_to_text(root: ET.Element) -> str:
 
 
 def batch_xml_to_text(root: ET.Element) -> str:
-    xml_str = ET.tostring(root, encoding="UTF-8", xml_declaration=True).decode("UTF-8")
-
-    xml_str = re.sub(r"<batch .*(?=name=)",'<batch xmlns:ndnp="http://www.loc.gov/ndnp" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.loc.gov/ndnp" xsi:schemaLocation="http://www.loc.gov/ndnp ./schema/ndnpBatch.xsd" ', xml_str)
-
-    return xml_str
+    return ET.tostring(root, encoding="UTF-8", xml_declaration=True).decode("UTF-8")
 
 
 def validate_issue_identity(issue_path: Path, from_date_path: str, from_edition: str) -> None:
@@ -384,13 +380,7 @@ def build_updated_batch_xml(
             issue.text = issue_text.replace(old_stem, new_stem)
             break
     
-    # Clean up ndnp: namespace prefixes in XML
-    if verbose:
-        log_action(f'[VERBOSE] removing "ndnp:" namespace prefixes from BATCH.xml.', dry_run)
-    xml_str = batch_xml_to_text(root)
-    xml_str = xml_str.replace("ndnp:", "")
-
-    return xml_str
+    return batch_xml_to_text(root)
 
 
 def mets_has_questionable_date(src_path: Path, target_date: str, dry_run: bool, verbose: bool) -> bool:
